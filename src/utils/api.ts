@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://pms-backend-zk6g.onrender.com/api';
 
 export const fetchApi = async (endpoint: string, options: any = {}) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
