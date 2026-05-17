@@ -3,29 +3,29 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/utils/api";
-import VisitorModal from "@/components/dashboard/VisitorModal";
+import GatePassModal from "@/components/dashboard/GatePassModal";
 import { ModalMode } from "@/components/dashboard/AssetModal";
 
-export default function VisitorsPage() {
+export default function GatePassPage() {
   const [userRole, setUserRole] = useState("super_admin");
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
-  const [selectedVisitor, setSelectedVisitor] = useState<any>(null);
+  const [selectedGatePass, setSelectedGatePass] = useState<any>(null);
 
   const metrics = {
-    total: 156,
-    today: 12,
-    inside: 7,
-    checkedOut: 5
+    total: 342,
+    today: 18,
+    pending: 5,
+    totalCost: "₹ 12,45,000"
   };
 
-  const [visitors, setVisitors] = useState<any[]>([]);
+  const [gatePasses, setGatePasses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchVisitors();
+    fetchGatePasses();
 
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("user");
@@ -46,60 +46,72 @@ export default function VisitorsPage() {
     }
   }, []);
 
-  const fetchVisitors = async () => {
+  const fetchGatePasses = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get('/visitors');
+      const response = await api.get('/materials');
       if (response.success) {
-        setVisitors(response.data);
+        setGatePasses(response.data);
       }
     } catch (err) {
-      console.error("Failed to fetch visitors:", err);
+      console.error("Failed to fetch gate passes:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredVisitors = visitors.filter(v => 
-    (v.visitorName || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (v.purposeOfVisit || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (v.visitorContactNumber || "").includes(searchTerm)
+  const filteredPasses = gatePasses.filter(gp => 
+    (gp.materialDetails || gp.material || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (gp.hsnCode || "").includes(searchTerm) ||
+    (gp.vehicleNo || gp.vehicle || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleOpenModal = (mode: ModalMode, visitor: any = null) => {
+  const handleOpenModal = (mode: ModalMode, gatePass: any = null) => {
     setModalMode(mode);
-    setSelectedVisitor(visitor);
+    setSelectedGatePass(gatePass);
     setIsModalOpen(true);
   };
 
-  const handleSaveVisitor = async (savedData: any) => {
+  const handleSaveGatePass = async (savedData: any) => {
     try {
       let response;
       if (modalMode === 'edit') {
-        response = await api.put(`/visitors/${savedData._id}`, savedData);
+        response = await api.put(`/materials/${savedData._id}`, savedData);
       } else {
-        response = await api.post('/visitors', savedData);
+        response = await api.post('/materials', savedData);
       }
       
       if (response.success) {
-        fetchVisitors();
+        fetchGatePasses();
       }
     } catch (err) {
-      console.error("Failed to save visitor:", err);
+      console.error("Failed to save gate pass:", err);
     }
     setIsModalOpen(false);
   };
 
-  const handleCheckOut = async (id: string) => {
-    if (confirm("Check out this visitor?")) {
+  const handleClear = async (id: string) => {
+    if (confirm("Mark this gate pass as cleared?")) {
       try {
-        const outTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        const response = await api.put(`/visitors/${id}`, { status: 'OUT', outTime: outTime });
+        const response = await api.put(`/materials/${id}`, { status: 'CLEARED', outTime: new Date() });
         if (response.success) {
-          fetchVisitors();
+          fetchGatePasses();
         }
       } catch (err) {
-        console.error("Failed to check out visitor:", err);
+        console.error("Failed to clear gate pass:", err);
+      }
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this gate pass?")) {
+      try {
+        const response = await api.delete(`/materials/${id}`);
+        if (response.success) {
+          fetchGatePasses();
+        }
+      } catch (err) {
+        console.error("Failed to delete gate pass:", err);
       }
     }
   };
@@ -109,8 +121,8 @@ export default function VisitorsPage() {
       {/* Header & Role Selector */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2 className="fw-bold mb-0" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Visitor Management</h2>
-          <p className="text-muted small mb-0">Track and manage all visitors entering the premises</p>
+          <h2 className="fw-bold mb-0" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Material Gate Pass</h2>
+          <p className="text-muted small mb-0">Track inward and outward material movement</p>
         </div>
         <div className="d-flex gap-3 align-items-center">
           <div className="d-flex align-items-center bg-light rounded-pill p-1">
@@ -122,7 +134,7 @@ export default function VisitorsPage() {
               style={{ width: '130px', cursor: 'pointer' }}
             >
               <option value="super_admin">Super Admin</option>
-              <option value="security">Security Head</option>
+              <option value="security">Security Officer</option>
               <option value="viewer">Viewer</option>
             </select>
           </div>
@@ -135,7 +147,7 @@ export default function VisitorsPage() {
               style={{ backgroundColor: '#10B981', fontSize: '0.75rem' }}
               onClick={() => handleOpenModal('create')}
             >
-              <i className="bi bi-plus-lg me-1"></i> Add New Visitor
+              <i className="bi bi-plus-lg me-1"></i> Create Gate Pass
             </button>
           )}
         </div>
@@ -146,10 +158,10 @@ export default function VisitorsPage() {
         <div className="col-md-3">
           <div className="bg-white p-3 rounded-xl border shadow-sm d-flex align-items-center gap-3 transition-all hover-lift">
             <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-people fs-4"></i>
+              <i className="bi bi-file-earmark-text fs-4"></i>
             </div>
             <div>
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Total Visitors</div>
+              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Total Gate Pass</div>
               <h3 className="fw-bold mb-0 text-dark">{metrics.total}</h3>
               <div className="text-muted" style={{ fontSize: '0.7rem' }}>All Time</div>
             </div>
@@ -158,36 +170,36 @@ export default function VisitorsPage() {
         <div className="col-md-3">
           <div className="bg-white p-3 rounded-xl border shadow-sm d-flex align-items-center gap-3 transition-all hover-lift">
             <div className="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-person-check fs-4"></i>
+              <i className="bi bi-calendar-event fs-4"></i>
             </div>
             <div>
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Today's Visitors</div>
+              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Today's Gate Pass</div>
               <h3 className="fw-bold mb-0 text-dark">{metrics.today}</h3>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Today</div>
+              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Issued Today</div>
             </div>
           </div>
         </div>
         <div className="col-md-3">
           <div className="bg-white p-3 rounded-xl border shadow-sm d-flex align-items-center gap-3 transition-all hover-lift">
             <div className="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-clock-history fs-4"></i>
+              <i className="bi bi-hourglass-split fs-4"></i>
             </div>
             <div>
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Currently Inside</div>
-              <h3 className="fw-bold mb-0 text-dark">{metrics.inside}</h3>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>In Building</div>
+              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Pending Gate Pass</div>
+              <h3 className="fw-bold mb-0 text-dark">{metrics.pending}</h3>
+              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Awaiting Action</div>
             </div>
           </div>
         </div>
         <div className="col-md-3">
           <div className="bg-white p-3 rounded-xl border shadow-sm d-flex align-items-center gap-3 transition-all hover-lift">
-            <div className="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-box-arrow-right fs-4"></i>
+            <div className="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
+              <i className="bi bi-currency-rupee fs-4"></i>
             </div>
             <div>
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Checked Out Today</div>
-              <h3 className="fw-bold mb-0 text-dark">{metrics.checkedOut}</h3>
-              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Today</div>
+              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Total Material Cost</div>
+              <h3 className="fw-bold mb-0 text-dark">{metrics.totalCost}</h3>
+              <div className="text-muted" style={{ fontSize: '0.7rem' }}>Cumulative Value</div>
             </div>
           </div>
         </div>
@@ -195,12 +207,12 @@ export default function VisitorsPage() {
 
       {/* Filters */}
       <div className="bg-white p-3 rounded-xl border shadow-sm mb-4 d-flex flex-wrap gap-3 align-items-center justify-content-between">
-        <div className="d-flex align-items-center bg-light rounded-pill px-3 py-2 flex-grow-1" style={{ maxWidth: '300px' }}>
+        <div className="d-flex align-items-center bg-light rounded-pill px-3 py-2 flex-grow-1" style={{ maxWidth: '400px' }}>
           <i className="bi bi-search text-muted me-2"></i>
           <input 
             type="text" 
             className="border-0 bg-transparent w-100 shadow-none small" 
-            placeholder="Search by visitor name, contact no, purpose..." 
+            placeholder="Search by material, HSN code, vehicle no..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{ outline: 'none', fontSize: '0.85rem' }}
@@ -215,19 +227,16 @@ export default function VisitorsPage() {
               <option>Yesterday</option>
             </select>
           </div>
-          <select className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-medium" style={{ fontSize: '0.75rem', minWidth: '130px' }}>
-            <option>Purpose: All</option>
-            <option>Meeting</option>
-            <option>Delivery</option>
-            <option>Interview</option>
+          <select className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-medium" style={{ fontSize: '0.75rem' }}>
+            <option>Type: All</option>
+            <option>Returnable</option>
+            <option>Non-Returnable</option>
           </select>
-          <select className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-medium" style={{ fontSize: '0.75rem', minWidth: '130px' }}>
-            <option>Visit Status: All</option>
-            <option>Inside</option>
-            <option>Checked Out</option>
+          <select className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-medium" style={{ fontSize: '0.75rem' }}>
+            <option>Purpose: All</option>
           </select>
           <button className="btn btn-light btn-sm border rounded-pill px-3 shadow-none fw-bold text-muted d-flex align-items-center gap-2" style={{ fontSize: '0.75rem' }}>
-            <i className="bi bi-arrow-clockwise"></i> Reset
+            <i className="bi bi-funnel"></i> Filters
           </button>
         </div>
       </div>
@@ -238,74 +247,80 @@ export default function VisitorsPage() {
           <table className="table table-hover mb-0 align-middle">
             <thead className="bg-light">
               <tr>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em', width: '50px' }}>S.No</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Visitor Name</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Contact No</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Address</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>S.No</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Type of Gate Pass</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Material Details</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>HSN Code</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-center" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Qty</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-end" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Rate (₹)</th>
+                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-end" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Total Cost (₹)</th>
                 <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Place of Visit</th>
                 <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Purpose</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>ID Particulars</th>
                 <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Vehicle No</th>
                 <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Intime</th>
                 <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Outtime</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Status</th>
                 <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-end" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredVisitors.map((visitor, index) => (
-                <tr key={visitor._id} className="transition-all hover-bg-light" style={{ fontSize: '0.85rem' }}>
+              {filteredPasses.map((gp, index) => (
+                <tr key={gp._id} className="transition-all hover-bg-light" style={{ fontSize: '0.85rem' }}>
                   <td className="px-3 py-3 fw-bold text-muted">{index + 1}</td>
-                  <td className="px-3 py-3 fw-medium text-dark">{visitor.visitorName}</td>
-                  <td className="px-3 py-3 fw-mono text-muted">{visitor.visitorContactNumber}</td>
-                  <td className="px-3 py-3 text-muted" style={{ maxWidth: '120px' }}>
-                    <div className="text-truncate">{visitor.address}</div>
-                  </td>
-                  <td className="px-3 py-3 text-muted">{visitor.placeOfVisit}</td>
-                  <td className="px-3 py-3">{visitor.purposeOfVisit}</td>
-                  <td className="px-3 py-3 text-muted" style={{ maxWidth: '150px' }}>
-                    <div className="text-truncate" title={visitor.idParticulars}>{visitor.idParticulars}</div>
-                  </td>
-                  <td className="px-3 py-3 fw-bold">{visitor.vehicleNumber}</td>
-                  <td className="px-3 py-3 text-muted">{visitor.inTime || '-'}</td>
-                  <td className="px-3 py-3 text-muted">{visitor.outTime || '-'}</td>
                   <td className="px-3 py-3">
-                    <span className={`badge rounded-pill px-2 py-1 fw-medium border ${
-                      visitor.status === 'OUT' 
-                        ? 'bg-success bg-opacity-10 text-success border-success' 
-                        : 'bg-primary bg-opacity-10 text-primary border-primary'
+                    <span className={`badge rounded-pill px-2 py-1 fw-medium ${
+                      gp.typeOfGatePass === 'Returnable' ? 'bg-warning bg-opacity-10 text-warning border border-warning' : 'bg-info bg-opacity-10 text-info border border-info'
                     }`}>
-                      {visitor.status === 'OUT' ? 'Checked Out' : 'Inside'}
+                      {gp.typeOfGatePass || gp.type}
                     </span>
                   </td>
+                  <td className="px-3 py-3 fw-medium text-dark">{gp.materialDetails || gp.material}</td>
+                  <td className="px-3 py-3 fw-mono text-muted">{gp.hsnCode}</td>
+                  <td className="px-3 py-3 text-center fw-bold">{gp.quantity}</td>
+                  <td className="px-3 py-3 text-end">{gp.rate}</td>
+                  <td className="px-3 py-3 text-end fw-bold">{gp.totalCost}</td>
+                  <td className="px-3 py-3 text-muted">{gp.placeOfVisit || gp.place}</td>
+                  <td className="px-3 py-3">{gp.purpose}</td>
+                  <td className="px-3 py-3 fw-bold">{gp.vehicleNo || gp.vehicle}</td>
+                  <td className="px-3 py-3 text-muted">{gp.inTime ? new Date(gp.inTime).toLocaleTimeString() : '-'}</td>
+                  <td className="px-3 py-3 text-muted">{gp.outTime ? new Date(gp.outTime).toLocaleTimeString() : '-'}</td>
                   <td className="px-3 py-3">
                     <div className="d-flex gap-2 justify-content-end">
                       <button 
                         className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-primary" 
                         style={{ width: '28px', height: '28px' }} 
-                        title="View Details"
-                        onClick={() => handleOpenModal('view', visitor)}
+                        title="View"
+                        onClick={() => handleOpenModal('view', gp)}
                       >
                         <i className="bi bi-eye"></i>
                       </button>
                       {userRole !== 'viewer' && (
                         <button 
-                          className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-success" 
+                          className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-primary" 
                           style={{ width: '28px', height: '28px' }} 
                           title="Edit"
-                          onClick={() => handleOpenModal('edit', visitor)}
+                          onClick={() => handleOpenModal('edit', gp)}
                         >
                           <i className="bi bi-pencil"></i>
                         </button>
                       )}
-                      {userRole !== 'viewer' && visitor.status === 'IN' && (
+                      {userRole !== 'viewer' && gp.status === 'PENDING' && (
+                        <button 
+                          className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-success" 
+                          style={{ width: '28px', height: '28px' }} 
+                          title="Clear Gate Pass"
+                          onClick={() => handleClear(gp._id)}
+                        >
+                          <i className="bi bi-check-circle"></i>
+                        </button>
+                      )}
+                      {userRole === 'super_admin' && (
                         <button 
                           className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-danger" 
                           style={{ width: '28px', height: '28px' }} 
-                          title="Check Out"
-                          onClick={() => handleCheckOut(visitor._id)}
+                          title="Delete"
+                          onClick={() => handleDelete(gp._id)}
                         >
-                          <i className="bi bi-box-arrow-right"></i>
+                          <i className="bi bi-trash"></i>
                         </button>
                       )}
                     </div>
@@ -317,15 +332,13 @@ export default function VisitorsPage() {
         </div>
         <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
           <span className="text-muted small fw-medium" style={{ fontSize: '0.75rem' }}>
-            Showing 1 to {filteredVisitors.length} of {metrics.total} entries
+            Showing 1 to {filteredPasses.length} of {metrics.total} entries
           </span>
           <div className="d-flex gap-1">
             <button className="btn btn-sm btn-white border px-2 shadow-none" disabled><i className="bi bi-chevron-left"></i></button>
             <button className="btn btn-sm btn-primary border-0 px-3 shadow-none" style={{ backgroundColor: '#10B981' }}>1</button>
             <button className="btn btn-sm btn-white border px-3 shadow-none">2</button>
-            <button className="btn btn-sm btn-white border px-3 shadow-none">3</button>
             <span className="px-2 align-self-center text-muted">...</span>
-            <button className="btn btn-sm btn-white border px-3 shadow-none">16</button>
             <button className="btn btn-sm btn-white border px-2 shadow-none"><i className="bi bi-chevron-right"></i></button>
           </div>
         </div>
@@ -340,11 +353,11 @@ export default function VisitorsPage() {
         .fw-mono { font-family: monospace; }
       `}</style>
       
-      <VisitorModal 
+      <GatePassModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveVisitor}
-        editData={selectedVisitor}
+        onSave={handleSaveGatePass}
+        editData={selectedGatePass}
         mode={modalMode}
       />
     </div>

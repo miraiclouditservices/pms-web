@@ -2,22 +2,80 @@
 
 import styles from "@/styles/modules/Dashboard.module.css";
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import { api } from "@/utils/api";
 
 export default function DashboardPage() {
-  const stats = [
-    { label: "Total Properties", value: "24", trend: "+2 this month", trendUp: true, icon: "bi-building", color: "var(--primary)" },
-    { label: "Active Units", value: "1,248", trend: "+45 this month", trendUp: true, icon: "bi-grid-3x3-gap", color: "#3B82F6" },
-    { label: "Visitors Today", value: "382", trend: "-5% vs yesterday", trendUp: false, icon: "bi-people", color: "#8B5CF6" },
-    { label: "SLA Adherence", value: "98.4%", trend: "+1.2% vs last week", trendUp: true, icon: "bi-check-circle", color: "#10B981" },
-  ];
+  const [metrics, setMetrics] = useState({
+    totalProperties: 0,
+    totalUnits: 0,
+    occupiedUnits: 0,
+    vacantUnits: 0,
+    activeLeaseCount: 0,
+    pendingComplaints: 0,
+    visitorsToday: 0,
+    amcExpiryAlerts: 0,
+    upcomingBookings: 0,
+    revenueSummary: 0
+  });
 
-  const criticalIssues = [
-    { id: "T-892", subject: "Main Gate Scanner Malfunction", priority: "Critical", status: "Open", assigned: "Rahul V." },
-    { id: "T-895", subject: "CCTV Blind Spot - Block B", priority: "High", status: "In Progress", assigned: "Ankit S." },
+  const [recentComplaints, setRecentComplaints] = useState<any[]>([]);
+
+  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await api.get('/dashboard/metrics');
+        if (response.success) {
+          setMetrics(response.data.metrics);
+          setRecentComplaints(response.data.recentComplaints);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard metrics:", err);
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error("Failed to parse user from localStorage", e);
+        }
+      }
+    }
+
+    fetchDashboardData();
+  }, []);
+
+  const stats = [
+    ...(user?.role === "Admin" ? [
+      { label: "Total Properties", value: metrics.totalProperties, icon: "bi-building", color: "var(--primary)" },
+      { label: "Total Units", value: metrics.totalUnits, icon: "bi-grid-3x3-gap", color: "#3B82F6" },
+      { label: "Occupied Units", value: metrics.occupiedUnits, icon: "bi-person-check-fill", color: "#10B981" },
+      { label: "Vacant Units", value: metrics.vacantUnits, icon: "bi-house-x", color: "#F59E0B" }
+    ] : []),
+    { label: "Active Leases", value: metrics.activeLeaseCount, icon: "bi-file-earmark-text", color: "#6366F1" },
+    { label: "Pending Complaints", value: metrics.pendingComplaints, icon: "bi-exclamation-triangle", color: "#EF4444" },
+    { label: "Visitors Today", value: metrics.visitorsToday, icon: "bi-person-badge", color: "#8B5CF6" },
+    ...(user?.role === "Admin" ? [
+      { label: "AMC Alerts", value: metrics.amcExpiryAlerts, icon: "bi-alarm", color: "#EC4899" }
+    ] : []),
+    { label: "Upcoming Bookings", value: metrics.upcomingBookings, icon: "bi-calendar-event", color: "#06B6D4" },
+    { label: "Revenue", value: `₹${(metrics.revenueSummary / 100000).toFixed(1)}L`, icon: "bi-cash-stack", color: "#10B981" },
   ];
 
   return (
     <div className={styles.dashboard}>
+      <div className={styles.header}>
+        <div>
+          <h2>System Overview</h2>
+          <p>Real-time analytics and operational performance metrics.</p>
+        </div>
+      </div>
+
       {/* Top Stats Grid */}
       <div className={styles.statsGrid}>
         {stats.map((stat, idx) => (
@@ -26,10 +84,6 @@ export default function DashboardPage() {
               <div className={styles.statIcon} style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
                 <i className={`bi ${stat.icon}`}></i>
               </div>
-              <span className={`${styles.statTrend} ${stat.trendUp ? "text-success" : "text-danger"}`}>
-                <i className={`bi bi-graph-${stat.trendUp ? "up" : "down"}`}></i>
-                {stat.trend}
-              </span>
             </div>
             <p className={styles.statLabel}>{stat.label}</p>
             <h3 className={styles.statValue}>{stat.value}</h3>
@@ -38,14 +92,11 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.mainGrid}>
-        {/* Recent Operations Panel */}
+        {/* Helpdesk Panel */}
         <div className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h5 className={styles.panelTitle}>Operational Intelligence</h5>
-            <div className="d-flex gap-2">
-              <button className="btn btn-outline-light border text-dark btn-sm rounded-pill">Export PDF</button>
-              <button className="btn btn-primary btn-sm rounded-pill">View All</button>
-            </div>
+            <h5 className={styles.panelTitle}>Pending Complaints</h5>
+            <Link href="/admin/helpdesk" className="btn btn-primary btn-sm rounded-pill px-3">View All</Link>
           </div>
           <div className={styles.panelBody}>
             <div className={styles.tableContainer}>
@@ -53,65 +104,48 @@ export default function DashboardPage() {
                 <thead>
                   <tr>
                     <th className={styles.th}>Ticket ID</th>
-                    <th className={styles.th}>Issue Subject</th>
+                    <th className={styles.th}>Description</th>
                     <th className={styles.th}>Priority</th>
                     <th className={styles.th}>Status</th>
-                    <th className={styles.th}>Assigned To</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {criticalIssues.map((issue) => (
-                    <tr key={issue.id}>
-                      <td className={styles.td}><span className="fw-bold text-primary">{issue.id}</span></td>
-                      <td className={styles.td}>{issue.subject}</td>
-                      <td className={styles.td}>
-                        <span className={`badge bg-${issue.priority === 'Critical' ? 'danger' : 'warning'} bg-opacity-10 text-${issue.priority === 'Critical' ? 'danger' : 'warning'} rounded-pill`}>
-                          {issue.priority}
-                        </span>
+                  {recentComplaints.length > 0 ? (
+                    recentComplaints.map((issue) => (
+                      <tr key={issue.id}>
+                        <td className={styles.td}><span className="fw-bold text-emerald">{issue.ticketNumber}</span></td>
+                        <td className={styles.td}>{issue.natureOfComplaint}</td>
+                        <td className={styles.td}>
+                          <span className={`badge bg-${issue.priority === 'High' ? 'danger' : 'warning'} bg-opacity-10 text-${issue.priority === 'High' ? 'danger' : 'warning'} rounded-pill px-3`}>
+                            {issue.priority}
+                          </span>
+                        </td>
+                        <td className={styles.td}>
+                          <span className={`badge rounded-pill px-2 py-1 ${
+                            issue.status === 'Open' ? 'bg-danger text-white' : 
+                            issue.status === 'In Progress' ? 'bg-warning text-dark' : 
+                            'bg-success text-white'
+                          }`} style={{ fontSize: '0.65rem' }}>
+                            {issue.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="text-center py-5 text-muted">
+                        <i className="bi bi-check2-circle mb-2 d-block" style={{ fontSize: '1.5rem' }}></i>
+                        <span className="small">No pending complaints at the moment.</span>
                       </td>
-                      <td className={styles.td}>{issue.status}</td>
-                      <td className={styles.td}>{issue.assigned}</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        {/* System Health / Quick Insights */}
-        <div className="d-flex flex-column gap-4">
-          <div className={styles.panel} style={{ background: 'linear-gradient(135deg, var(--primary-dark) 0%, #065F46 100%)' }}>
-            <div className="p-4 text-white">
-              <div className="d-flex align-items-center gap-3 mb-3">
-                <div className="bg-white bg-opacity-20 rounded-circle p-2">
-                  <i className="bi bi-shield-check fs-4"></i>
-                </div>
-                <h5 className="mb-0 fw-bold">Platform Status</h5>
-              </div>
-              <p className="text-white text-opacity-75 small mb-4">All global regions are currently operational. No active breaches reported.</p>
-              <div className="d-flex justify-content-between align-items-center bg-white bg-opacity-10 rounded-pill p-2 px-3">
-                <span className="small fw-medium">Active Watchmen</span>
-                <span className="badge bg-white text-dark rounded-pill">1,240</span>
-              </div>
-            </div>
-          </div>
 
-          <div className={styles.panel}>
-            <div className="p-4">
-              <h6 className="fw-bold mb-3">Global Occupancy</h6>
-              <div className="d-flex align-items-center gap-3 mb-3">
-                <div className="flex-grow-1">
-                  <div className="progress" style={{ height: '8px' }}>
-                    <div className="progress-bar bg-primary" style={{ width: '82%' }}></div>
-                  </div>
-                </div>
-                <span className="small fw-bold">82%</span>
-              </div>
-              <p className="text-muted small mb-0">Total capacity across all managed buildings worldwide.</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

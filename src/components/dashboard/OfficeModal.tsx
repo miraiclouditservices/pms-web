@@ -11,25 +11,40 @@ interface OfficeModalProps {
 
 export default function OfficeModal({ isOpen, onClose, onSave, editData }: OfficeModalProps) {
   const [formData, setFormData] = useState({
-    name: "",
-    manager: "",
-    phone: "",
-    address: "",
+    propertyName: "",
+    managerName: "",
+    phoneNo: "",
+    location: "",
     securityLevel: "Medium",
-    capacity: ""
+    capacity: "",
+    propertyType: "Office",
+    openingTime: "09:00",
+    closingTime: "18:00"
   });
 
   useEffect(() => {
     if (editData) {
-      setFormData(editData);
+      setFormData({
+        propertyName: editData.propertyName || editData.name || "",
+        managerName: editData.managerName || editData.manager || "",
+        phoneNo: editData.phoneNo || editData.phone || "",
+        location: editData.location || editData.address || "",
+        securityLevel: editData.securityLevel || "Medium",
+        capacity: editData.capacity || "",
+        propertyType: editData.propertyType || "Office",
+        ...editData
+      });
     } else {
       setFormData({
-        name: "",
-        manager: "",
-        phone: "",
-        address: "",
+        propertyName: "",
+        managerName: "",
+        phoneNo: "",
+        location: "",
         securityLevel: "Medium",
-        capacity: ""
+        capacity: "",
+        propertyType: "Office",
+        openingTime: "09:00",
+        closingTime: "18:00"
       });
     }
   }, [editData, isOpen]);
@@ -59,8 +74,8 @@ export default function OfficeModal({ isOpen, onClose, onSave, editData }: Offic
                     type="text" 
                     className="form-control" 
                     required 
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    value={formData.propertyName}
+                    onChange={(e) => setFormData({...formData, propertyName: e.target.value})}
                     placeholder="e.g. Tech Park Tower A"
                   />
                 </div>
@@ -70,8 +85,8 @@ export default function OfficeModal({ isOpen, onClose, onSave, editData }: Offic
                     type="text" 
                     className="form-control" 
                     required 
-                    value={formData.manager}
-                    onChange={(e) => setFormData({...formData, manager: e.target.value})}
+                    value={formData.managerName}
+                    onChange={(e) => setFormData({...formData, managerName: e.target.value})}
                   />
                 </div>
                 <div className="col-md-6">
@@ -80,8 +95,8 @@ export default function OfficeModal({ isOpen, onClose, onSave, editData }: Offic
                     type="tel" 
                     className="form-control" 
                     required 
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    value={formData.phoneNo}
+                    onChange={(e) => setFormData({...formData, phoneNo: e.target.value})}
                   />
                 </div>
                 <div className="col-12">
@@ -90,8 +105,8 @@ export default function OfficeModal({ isOpen, onClose, onSave, editData }: Offic
                     className="form-control" 
                     rows={2}
                     required 
-                    value={formData.address}
-                    onChange={(e) => setFormData({...formData, address: e.target.value})}
+                    value={formData.location}
+                    onChange={(e) => setFormData({...formData, location: e.target.value})}
                   ></textarea>
                 </div>
                 <div className="col-md-6">
@@ -115,6 +130,24 @@ export default function OfficeModal({ isOpen, onClose, onSave, editData }: Offic
                     required 
                     value={formData.capacity}
                     onChange={(e) => setFormData({...formData, capacity: e.target.value})}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-muted">OPENING TIME</label>
+                  <input 
+                    type="time" 
+                    className="form-control" 
+                    value={formData.openingTime}
+                    onChange={(e) => setFormData({...formData, openingTime: e.target.value})}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-muted">CLOSING TIME</label>
+                  <input 
+                    type="time" 
+                    className="form-control" 
+                    value={formData.closingTime}
+                    onChange={(e) => setFormData({...formData, closingTime: e.target.value})}
                   />
                 </div>
               </div>

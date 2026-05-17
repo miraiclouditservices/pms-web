@@ -1,24 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { api } from "@/utils/api";
 
 interface UnitModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (unit: any) => void;
   floorLevel: string;
+  editData?: any;
 }
 
-export default function UnitModal({ isOpen, onClose, onSave, floorLevel }: UnitModalProps) {
+export default function UnitModal({ isOpen, onClose, onSave, floorLevel, editData }: UnitModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [owners, setOwners] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    id: "",
+    unitNumber: "",
     count: 5,
-    status: "Occupied",
-    type: "Leased",
-    owner: ""
+    unitStatus: "Occupied",
+    unitType: "Office",
+    ownerName: "",
+    sqft: 1200
   });
+
+  useEffect(() => {
+    if (isOpen) {
+        fetchOwners();
+    }
+  }, [isOpen]);
+
+  const fetchOwners = async () => {
+    try {
+        const response = await api.get('/owners');
+        if (response.success) {
+            setOwners(response.data);
+        }
+    } catch (err) {
+        console.error("Failed to fetch owners:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        unitNumber: editData.unitNumber || editData.id || "",
+        count: 1,
+        unitStatus: editData.unitStatus || editData.status || "Occupied",
+        unitType: editData.unitType || editData.type || "Office",
+        ownerName: editData.ownerName || editData.owner || "",
+        sqft: editData.sqft || 1200
+      });
+      setIsBulkMode(false);
+    } else {
+      setFormData({
+        unitNumber: "",
+        count: 5,
+        unitStatus: "Occupied",
+        unitType: "Office",
+        ownerName: "",
+        sqft: 1200
+      });
+    }
+  }, [editData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -28,9 +72,9 @@ export default function UnitModal({ isOpen, onClose, onSave, floorLevel }: UnitM
     await new Promise(resolve => setTimeout(resolve, 600));
     
     if (isBulkMode) {
-      const prefix = formData.id;
+      const prefix = formData.unitNumber;
       for (let i = 1; i <= formData.count; i++) {
-        onSave({ ...formData, id: `${prefix}-${i}` });
+        onSave({ ...formData, unitNumber: `${prefix}-${i}` });
       }
     } else {
       onSave(formData);
@@ -40,11 +84,12 @@ export default function UnitModal({ isOpen, onClose, onSave, floorLevel }: UnitM
     onClose();
     
     setFormData({
-      id: "",
+      unitNumber: "",
       count: 5,
-      status: "Occupied",
-      type: "Leased",
-      owner: ""
+      unitStatus: "Occupied",
+      unitType: "Office",
+      ownerName: "",
+      sqft: 1200
     });
   };
 
@@ -64,31 +109,32 @@ export default function UnitModal({ isOpen, onClose, onSave, floorLevel }: UnitM
         <div className="modal-content border-0 rounded-xl shadow-2xl overflow-hidden bg-white">
           <div className="modal-header border-bottom-0 p-4 bg-light d-flex justify-content-between align-items-center">
             <div>
-              <h5 className="modal-title fw-bold fs-4">Add Units</h5>
+              <h5 className="modal-title fw-bold fs-4">{editData ? 'Edit Unit Assignment' : 'Add Units'}</h5>
               <p className="text-muted small mb-0">{floorLevel} · Space Allocation</p>
             </div>
-            <div className="form-check form-switch me-3">
-              <input 
-                className="form-check-input" type="checkbox" role="switch" 
-                checked={isBulkMode} onChange={(e) => setIsBulkMode(e.target.checked)} 
-              />
-              <label className="form-check-label x-small fw-bold text-muted text-uppercase" style={{ fontSize: '0.65rem' }}>Bulk Mode</label>
-            </div>
+            {!editData && (
+              <div className="form-check form-switch me-3">
+                <input 
+                  className="form-check-input" type="checkbox" role="switch" 
+                  checked={isBulkMode} onChange={(e) => setIsBulkMode(e.target.checked)} 
+                />
+                <label className="form-check-label x-small fw-bold text-muted text-uppercase" style={{ fontSize: '0.65rem' }}>Bulk Mode</label>
+              </div>
+            )}
             <button type="button" className="btn-close shadow-none" onClick={onClose}></button>
           </div>
           
           <form onSubmit={handleSubmit}>
             <div className="modal-body p-4">
               <div className="row g-4">
-                <div className={isBulkMode ? "col-md-8" : "col-12"}>
+                <div className={isBulkMode ? "col-md-8" : "col-md-4"}>
                   <label className="form-label small fw-bold text-muted text-uppercase mb-2">
-                    {isBulkMode ? "Unit Prefix" : "Unit ID / Number"}
+                    {isBulkMode ? "Unit Prefix" : "Unit ID"}
                   </label>
                   <input 
                     type="text" className="form-control form-control-lg bg-light border-0" required 
-                    value={formData.id} onChange={(e) => setFormData({...formData, id: e.target.value})}
+                    value={formData.unitNumber} onChange={(e) => setFormData({...formData, unitNumber: e.target.value})}
                     placeholder={isBulkMode ? "e.g. 50" : "e.g. 505"}
-                    style={{ fontSize: '1rem' }}
                   />
                 </div>
                 {isBulkMode && (
@@ -98,43 +144,53 @@ export default function UnitModal({ isOpen, onClose, onSave, floorLevel }: UnitM
                       type="number" className="form-control form-control-lg bg-light border-0" required 
                       min="1" max="50" value={formData.count}
                       onChange={(e) => setFormData({...formData, count: parseInt(e.target.value) || 1})}
-                      style={{ fontSize: '1rem' }}
                     />
                   </div>
                 )}
-                <div className="col-md-6">
+                <div className="col-md-4">
+                  <label className="form-label small fw-bold text-muted text-uppercase mb-2">Sq. Ft.</label>
+                  <input 
+                    type="number" className="form-control form-control-lg bg-light border-0" required 
+                    value={formData.sqft} onChange={(e) => setFormData({...formData, sqft: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                <div className="col-md-4">
                   <label className="form-label small fw-bold text-muted text-uppercase mb-2">Status</label>
                   <select 
                     className="form-select form-select-lg bg-light border-0"
-                    value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    style={{ fontSize: '1rem' }}
+                    value={formData.unitStatus} onChange={(e) => setFormData({...formData, unitStatus: e.target.value})}
                   >
-                    <option>Occupied</option>
-                    <option>Available</option>
-                    <option>Reserved</option>
-                    <option>Maintenance</option>
+                    <option value="Occupied">Occupied</option>
+                    <option value="Vacant">Available</option>
+                    <option value="Reserved">Reserved</option>
+                    <option value="Maintenance">Maintenance</option>
                   </select>
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label small fw-bold text-muted text-uppercase mb-2">Type</label>
+                  <label className="form-label small fw-bold text-muted text-uppercase mb-2">Unit Type</label>
                   <select 
                     className="form-select form-select-lg bg-light border-0"
-                    value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})}
-                    style={{ fontSize: '1rem' }}
+                    value={formData.unitType} onChange={(e) => setFormData({...formData, unitType: e.target.value})}
                   >
-                    <option>Leased</option>
-                    <option>Owned</option>
-                    <option>Internal</option>
+                    <option value="Office">Office Space</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="IT">IT / Server Room</option>
+                    <option value="Retail">Retail</option>
                   </select>
                 </div>
-                <div className="col-12">
-                  <label className="form-label small fw-bold text-muted text-uppercase mb-2">Owner / Tenant Name</label>
-                  <input 
-                    type="text" className="form-control form-control-lg bg-light border-0" 
-                    value={formData.owner} onChange={(e) => setFormData({...formData, owner: e.target.value})}
-                    placeholder="e.g. John Doe / TechCorp"
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold text-muted text-uppercase mb-2">Occupant / Owner</label>
+                  <select 
+                    className="form-select form-select-lg bg-light border-0"
+                    value={formData.ownerName} onChange={(e) => setFormData({...formData, ownerName: e.target.value})}
                     style={{ fontSize: '1rem' }}
-                  />
+                  >
+                    <option value="">Select Registered Owner</option>
+                    {owners.map(o => (
+                        <option key={o._id} value={o.ownerName}>{o.ownerName} ({o.contactNumber})</option>
+                    ))}
+                    <option value="Direct Tenant">Direct Tenant / Others</option>
+                  </select>
                 </div>
               </div>
             </div>

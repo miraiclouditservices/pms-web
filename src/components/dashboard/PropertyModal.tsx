@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/utils/api";
 
 interface TowerConfig {
   id: string;
@@ -19,11 +20,13 @@ interface PropertyModalProps {
 export default function PropertyModal({ isOpen, onClose, onSave, editData }: PropertyModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
-    type: "IT Park",
+    propertyName: "",
+    propertyType: "Office",
     location: "",
     region: "APAC",
-    status: "Active"
+    status: "Active",
+    openingTime: "09:00",
+    closingTime: "18:00"
   });
 
   const [towers, setTowers] = useState<TowerConfig[]>([
@@ -34,25 +37,31 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
     if (isOpen) {
       if (editData) {
         setFormData({
-          name: editData.name || "",
-          type: editData.type || "IT Park",
+          propertyName: editData.propertyName || editData.name || "",
+          propertyType: editData.propertyType || editData.type || "Office",
           location: editData.location || "",
           region: editData.region || "APAC",
-          status: editData.status || "Active"
+          status: editData.status || "Active",
+          openingTime: editData.openingTime || "09:00",
+          closingTime: editData.closingTime || "18:00"
         });
         setTowers(editData.towerConfigs || [{ id: '1', name: 'Tower A', floors: 10, units: 100 }]);
       } else {
         setFormData({
-          name: "",
-          type: "IT Park",
+          propertyName: "",
+          propertyType: "Office",
           location: "",
           region: "APAC",
-          status: "Active"
+          status: "Active",
+          openingTime: "09:00",
+          closingTime: "18:00"
         });
         setTowers([{ id: '1', name: 'Tower A', floors: 10, units: 100 }]);
       }
     }
   }, [editData, isOpen]);
+
+
 
   if (!isOpen) return null;
 
@@ -135,7 +144,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
                   <label className="form-label fw-bold text-muted text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.1em' }}>Property Name</label>
                   <input 
                     type="text" className="form-control bg-light border-0 fw-bold" required 
-                    value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    value={formData.propertyName} onChange={(e) => setFormData({...formData, propertyName: e.target.value})}
                     placeholder="e.g. Emerald Tech Park"
                     style={{ fontSize: '0.85rem', padding: '0.75rem 1.25rem', borderRadius: '0.75rem' }}
                   />
@@ -144,11 +153,12 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
                   <label className="form-label fw-bold text-muted text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.1em' }}>Property Type</label>
                   <select 
                     className="form-select bg-light border-0 fw-bold"
-                    value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})}
+                    value={formData.propertyType} onChange={(e) => setFormData({...formData, propertyType: e.target.value})}
                     style={{ fontSize: '0.85rem', padding: '0.75rem 1.25rem', borderRadius: '0.75rem' }}
                   >
-                    <option>IT Park</option>
+                    <option>Office</option>
                     <option>Commercial</option>
+                    <option>IT Park</option>
                     <option>Mixed Use</option>
                     <option>Residential</option>
                   </select>
@@ -234,8 +244,24 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
                 </div>
               </div>
 
-              <div className="row g-4">
-                <div className="col-12">
+              <div className="row g-4 mt-1">
+                <div className="col-md-4">
+                  <label className="form-label fw-bold text-muted text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.1em' }}>Opening Time</label>
+                  <input 
+                    type="time" className="form-control bg-light border-0 fw-bold" 
+                    value={formData.openingTime} onChange={(e) => setFormData({...formData, openingTime: e.target.value})}
+                    style={{ fontSize: '0.85rem', padding: '0.75rem 1.25rem', borderRadius: '0.75rem' }}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label fw-bold text-muted text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.1em' }}>Closing Time</label>
+                  <input 
+                    type="time" className="form-control bg-light border-0 fw-bold" 
+                    value={formData.closingTime} onChange={(e) => setFormData({...formData, closingTime: e.target.value})}
+                    style={{ fontSize: '0.85rem', padding: '0.75rem 1.25rem', borderRadius: '0.75rem' }}
+                  />
+                </div>
+                <div className="col-md-4">
                   <label className="form-label fw-bold text-muted text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.1em' }}>Operational Status</label>
                   <select 
                     className="form-select bg-light border-0 fw-bold"

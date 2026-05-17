@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { api } from "@/utils/api";
 
 export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState("super_admin");
-  const [email, setEmail] = useState("admin@pms.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -23,11 +24,29 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Simulate network delay for authentication
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    if (selectedRole === "super_admin" || selectedRole === "office_owner") {
-       router.replace('/admin/dashboard');
+    try {
+      // Map frontend selection to backend roles
+      const role = selectedRole === 'super_admin' ? 'Admin' : 'Owner';
+      
+      const response = await api.post('/auth/login', { 
+        email, 
+        password,
+        role 
+      });
+      
+      if (response.success) {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        // Redirect based on role or to common dashboard
+        if (response.user.role === "Admin" || response.user.role === "Owner" || response.user.role === "Staff") {
+           router.replace('/admin/dashboard');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "Invalid credentials. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -149,7 +168,7 @@ export default function LoginPage() {
 
             <button 
               type="submit" 
-              className="btn btn-emerald w-100 py-3 fw-bold text-white shadow-emerald rounded-pill transition-all hover-lift mb-4"
+              className="btn btn-emerald w-100 py-3 fw-bold text-white shadow-emerald rounded-pill transition-all hover-lift mb-3"
               style={{ fontSize: '0.85rem' }}
               disabled={isLoading}
             >
@@ -164,7 +183,13 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="text-center pt-3 border-top mt-3">
+          <div className="text-center mb-4">
+            <p className="text-muted small mb-0">
+              Don't have an account? <Link href="/register" className="text-emerald fw-bold text-decoration-none">Create One</Link>
+            </p>
+          </div>
+
+          <div className="text-center pt-3 border-top">
             <Link href="/" className="text-decoration-none text-muted fw-bold hover-text-emerald transition-all" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
               <i className="bi bi-arrow-left me-2"></i>RETURN TO MAIN INTERFACE
             </Link>

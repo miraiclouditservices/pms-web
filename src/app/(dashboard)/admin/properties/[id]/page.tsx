@@ -1,66 +1,106 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import UnitModal from "@/components/dashboard/UnitModal";
+import { api } from "@/utils/api";
 
 export default function PropertyDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
   const params = use(paramsPromise);
   const propertyId = params.id;
-  const [activeTower, setActiveTower] = useState("Tower A");
+
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [selectedFloor, setSelectedFloor] = useState("");
+  const [selectedUnit, setSelectedUnit] = useState<any>(null);
+  const [property, setProperty] = useState<any>(null);
+  const [units, setUnits] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const towers = ["Tower A", "Tower B", "Tower C"];
+  const fetchPropertyAndUnits = async () => {
+    setIsLoading(true);
+    try {
+      const [propRes, unitRes] = await Promise.all([
+        api.get(`/properties/${propertyId}`),
+        api.get(`/units?property=${propertyId}`)
+      ]);
 
-  const [floorData, setFloorData] = useState([
-    {
-      id: "f1", level: 10, name: "Executive Terrace", units: [
-        { id: "1001", status: "Occupied", type: "Premium", owner: "Global Tech CEO" },
-        { id: "1002", status: "Available", type: "Executive", owner: "" },
-      ]
-    },
-    {
-      id: "f2", level: 9, name: "IT Operations", units: [
-        { id: "901", status: "Occupied", type: "Standard", owner: "Cloud Services" },
-        { id: "902", status: "Occupied", type: "Standard", owner: "Data Safe" },
-        { id: "903", status: "Available", type: "Standard", owner: "" },
-      ]
-    },
-    {
-      id: "f3", level: 8, name: "Development Hub", units: [
-        { id: "801", status: "Occupied", type: "Standard", owner: "Code Masters" },
-        { id: "802", status: "Reserved", type: "Standard", owner: "Startup X" },
-        { id: "803", status: "Occupied", type: "Standard", owner: "Logic Soft" },
-        { id: "804", status: "Available", type: "Standard", owner: "" },
-      ]
-    },
-    {
-      id: "f4", level: 7, name: "Sales & Marketing", units: [
-        { id: "701", status: "Occupied", type: "Standard", owner: "Growth Lab" },
-        { id: "702", status: "Maintenance", type: "Standard", owner: "" },
-        { id: "703", status: "Occupied", type: "Standard", owner: "Brand Boost" },
-      ]
+      if (propRes.success) setProperty(propRes.data);
+      if (unitRes.success) setUnits(unitRes.data);
+    } catch (err) {
+      console.error("Failed to fetch property details:", err);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
 
-  const handleAddUnit = (newUnit: any) => {
-    const updatedData = floorData.map(floor => {
-      if (floor.name === selectedFloor) {
-        return { ...floor, units: [...floor.units, newUnit] };
-      }
-      return floor;
-    });
-    setFloorData(updatedData);
+  useEffect(() => {
+    fetchPropertyAndUnits();
+  }, [propertyId]);
+
+  // Group units by floor
+  const getFloorData = () => {
+    if (!property) return [];
+    
+    const floors = [];
+    // Start from top floor down to 0 (or basement)
+    for (let i = property.totalFloors; i >= 0; i--) {
+      const floorUnits = units.filter(u => u.floorNumber === i.toString() || u.floorNumber === `Floor ${i}`);
+      floors.push({
+        id: `f${i}`,
+        level: i,
+        name: i === 0 ? "Ground Floor" : `Floor ${i}`,
+        units: floorUnits.map(u => ({
+          id: u.unitNumber,
+          status: u.unitStatus,
+          type: u.unitType || 'Standard',
+          owner: u.ownerName || ''
+        }))
+      });
+    }
+    return floors;
+  };
+
+  const floorData = getFloorData();
+
+  const handleSaveUnit = async (unitData: any) => {
+    try {
+        let response;
+        if (selectedUnit && selectedUnit._id) {
+            // Update existing
+            response = await api.put(`/units/${selectedUnit._id}`, {
+                ...unitData,
+                property: propertyId,
+                floorNumber: selectedFloor.replace('Floor ', '').replace('Level ', '').replace('LEVEL ', '')
+            });
+        } else {
+            // Create new
+            response = await api.post('/units', {
+                ...unitData,
+                property: propertyId,
+                floorNumber: selectedFloor.replace('Floor ', '').replace('Level ', '').replace('LEVEL ', '')
+            });
+        }
+
+        if (response.success) {
+            fetchPropertyAndUnits();
+            setSelectedUnit(null);
+        }
+    } catch (err) {
+        console.error("Failed to save unit:", err);
+    }
   };
 
   return (
     <div className="container-fluid p-0">
       <UnitModal
         isOpen={isUnitModalOpen}
-        onClose={() => setIsUnitModalOpen(false)}
-        onSave={handleAddUnit}
+        onClose={() => {
+            setIsUnitModalOpen(false);
+            setSelectedUnit(null);
+        }}
+        onSave={handleSaveUnit}
         floorLevel={selectedFloor}
+        editData={selectedUnit}
       />
 
       {/* Header */}
@@ -69,7 +109,7 @@ export default function PropertyDetailPage({ params: paramsPromise }: { params: 
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb small mb-1">
               <li className="breadcrumb-item"><Link href="/admin/properties" className="text-decoration-none text-muted">Properties</Link></li>
-              <li className="breadcrumb-item active" aria-current="page">{propertyId}</li>
+              <li className="breadcrumb-item active" aria-current="page">{property?.propertyName || 'Loading...'}</li>
             </ol>
           </nav>
           <h2 className="fw-bold mb-0" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Floors & Units Management</h2>
@@ -84,38 +124,36 @@ export default function PropertyDetailPage({ params: paramsPromise }: { params: 
         </div>
       </div>
 
-      {/* Tower Selector */}
-      <div className="d-flex gap-2 mb-4">
-        {towers.map(tower => (
-          <button
-            key={tower}
-            onClick={() => setActiveTower(tower)}
-            className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTower === tower ? 'btn-primary shadow-sm' : 'btn-light text-muted'}`}
-            style={activeTower === tower ? { backgroundColor: '#10B981', border: 'none', fontSize: '0.75rem' } : { fontSize: '0.75rem' }}
-          >
-            {tower}
-          </button>
-        ))}
-      </div>
+
 
       {/* Status Legend */}
-      <div className="bg-white rounded-xl shadow-sm border p-3 mb-4 d-flex gap-4 align-items-center overflow-x-auto">
-        <div className="small fw-bold text-muted text-uppercase me-2" style={{ fontSize: '0.65rem' }}>Status Legend:</div>
-        <div className="d-flex align-items-center gap-2">
-          <span className="badge rounded-circle p-1" style={{ width: '8px', height: '8px', backgroundColor: '#10B981' }}></span>
-          <span className="fw-semibold" style={{ fontSize: '0.75rem' }}>Occupied</span>
+      <div className="bg-white rounded-xl shadow-sm border p-4 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3" style={{ background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
+        <div className="d-flex gap-4 align-items-center">
+            <div className="small fw-bold text-muted text-uppercase me-2" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Occupancy Status:</div>
+            <div className="d-flex align-items-center gap-2">
+            <span className="badge rounded-circle p-1" style={{ width: '10px', height: '10px', backgroundColor: '#10B981', boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)' }}></span>
+            <span className="fw-bold" style={{ fontSize: '0.75rem', color: '#334155' }}>Occupied</span>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+            <span className="badge rounded-circle p-1" style={{ width: '10px', height: '10px', backgroundColor: '#CBD5E1' }}></span>
+            <span className="fw-bold" style={{ fontSize: '0.75rem', color: '#334155' }}>Vacant</span>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+            <span className="badge rounded-circle p-1" style={{ width: '10px', height: '10px', backgroundColor: '#3B82F6' }}></span>
+            <span className="fw-bold" style={{ fontSize: '0.75rem', color: '#334155' }}>Reserved</span>
+            </div>
         </div>
-        <div className="d-flex align-items-center gap-2">
-          <span className="badge rounded-circle p-1" style={{ width: '8px', height: '8px', backgroundColor: '#F59E0B' }}></span>
-          <span className="fw-semibold" style={{ fontSize: '0.75rem' }}>Available</span>
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <span className="badge rounded-circle p-1" style={{ width: '8px', height: '8px', backgroundColor: '#3B82F6' }}></span>
-          <span className="fw-semibold" style={{ fontSize: '0.75rem' }}>Reserved</span>
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <span className="badge rounded-circle p-1" style={{ width: '8px', height: '8px', backgroundColor: '#EF4444' }}></span>
-          <span className="fw-semibold" style={{ fontSize: '0.75rem' }}>Maintenance</span>
+        <div className="d-flex gap-4 align-items-center border-start ps-4">
+            <div className="small fw-bold text-muted text-uppercase me-2" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Unit Types:</div>
+            <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.7rem' }}>
+                <i className="bi bi-briefcase-fill"></i> Office
+            </div>
+            <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.7rem' }}>
+                <i className="bi bi-cpu-fill"></i> IT / Tech
+            </div>
+            <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.7rem' }}>
+                <i className="bi bi-shop"></i> Retail
+            </div>
         </div>
       </div>
 
@@ -148,21 +186,39 @@ export default function PropertyDetailPage({ params: paramsPromise }: { params: 
             <div className="p-4">
               <div className="row g-3">
                 {floor.units.map((unit, idx) => (
-                  <div key={idx} className="col-md-2 col-sm-4 col-6">
-                    <div className={`p-3 rounded-lg border-start border-4 shadow-sm h-100 transition-all unit-card ${unit.status === 'Occupied' ? 'border-success bg-success-light' :
-                      unit.status === 'Available' ? 'border-warning bg-warning-light' :
-                        unit.status === 'Reserved' ? 'border-info bg-info-light' : 'border-danger bg-danger-light'
-                      }`} style={{ cursor: 'pointer' }}>
-                      <div className="d-flex justify-content-between align-items-start mb-1">
-                        <span className="fw-bold" style={{ fontSize: '0.9rem' }}>{unit.id}</span>
-                        <i className="bi bi-three-dots text-muted" style={{ fontSize: '0.7rem' }}></i>
-                      </div>
-                      <div className="fw-bold text-muted text-uppercase mb-1" style={{ fontSize: '0.6rem' }}>{unit.type}</div>
-                      {unit.owner && (
-                        <div className="text-truncate fw-medium" title={unit.owner} style={{ fontSize: '0.7rem' }}>
-                          <i className="bi bi-person me-1"></i>{unit.owner}
+                  <div key={idx} className="col-lg-2 col-md-3 col-sm-4 col-6">
+                    <div 
+                      className={`p-3 rounded-xl border shadow-sm h-100 transition-all unit-card ${unit.status === 'Occupied' ? 'bg-white border-success' : 'bg-light border-transparent'}`} 
+                      style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
+                      onClick={() => {
+                          const fullUnit = units.find(u => u.unitNumber === unit.id);
+                          setSelectedUnit(fullUnit);
+                          setSelectedFloor(floor.name);
+                          setIsUnitModalOpen(true);
+                      }}
+                    >
+                      {unit.status === 'Occupied' && <div style={{ position: 'absolute', top: 0, right: 0, width: '40px', height: '40px', background: 'linear-gradient(135deg, transparent 50%, #10B981 50%)', opacity: 0.1 }}></div>}
+                      <div className="d-flex justify-content-between align-items-start mb-2">
+                        <span className="fw-bold text-dark" style={{ fontSize: '1rem', letterSpacing: '-0.02em' }}>{unit.id}</span>
+                        <div className="d-flex gap-2 align-items-center">
+                            <div className={`rounded-circle d-flex align-items-center justify-content-center`} style={{ width: '24px', height: '24px', backgroundColor: unit.status === 'Occupied' ? '#10B98115' : '#e2e8f0' }}>
+                                <i className={`bi ${unit.type === 'IT' ? 'bi-cpu-fill' : unit.type === 'Retail' ? 'bi-shop' : 'bi-briefcase-fill'} ${unit.status === 'Occupied' ? 'text-success' : 'text-muted'}`} style={{ fontSize: '0.7rem' }}></i>
+                            </div>
+                            <button className="btn btn-link p-0 text-muted shadow-none">
+                                <i className="bi bi-three-dots-vertical" style={{ fontSize: '0.8rem' }}></i>
+                            </button>
                         </div>
-                      )}
+                      </div>
+                      <div className="d-flex flex-column gap-1">
+                        <div className="fw-bold text-muted text-uppercase" style={{ fontSize: '0.55rem', letterSpacing: '0.05em' }}>{unit.type} Space</div>
+                        {unit.owner ? (
+                            <div className="text-truncate fw-bold text-dark mt-1" title={unit.owner} style={{ fontSize: '0.75rem' }}>
+                                {unit.owner}
+                            </div>
+                        ) : (
+                            <div className="text-muted italic" style={{ fontSize: '0.7rem' }}>Vacant Position</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
