@@ -17,7 +17,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [allUnits, setAllUnits] = useState<any[]>([]);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<any>({
     assetCode: "",
     assetDescription: "",
     category: "Others",

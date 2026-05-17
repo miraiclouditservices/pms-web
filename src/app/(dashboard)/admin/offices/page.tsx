@@ -7,6 +7,8 @@ import OfficeModal from "@/components/dashboard/OfficeModal";
 export default function OfficesPage() {
   const [offices, setOffices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editData, setEditData] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOffices();

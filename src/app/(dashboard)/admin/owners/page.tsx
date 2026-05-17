@@ -15,7 +15,7 @@ function OwnersContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
   const [ownerDetails, setOwnerDetails] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'units' | 'materials' | 'visitors'>('units');
+  const [activeTab, setActiveTab] = useState<'units' | 'materials' | 'visitors' | 'leases'>('units');
 
   // Pagination & Search & Filter State
   const [search, setSearch] = useState("");
@@ -100,7 +100,7 @@ function OwnersContent() {
       }
       
       if (response.success) {
-        fetchOwners(currentPage, search);
+        fetchOwners(currentPage, search, filterType, filterStatus);
       }
     } catch (err) {
       console.error("Failed to save owner:", err);
@@ -112,7 +112,7 @@ function OwnersContent() {
       try {
         const response = await api.delete(`/owners/${id}`);
         if (response.success) {
-          fetchOwners(currentPage, search);
+          fetchOwners(currentPage, search, filterType, filterStatus);
         }
       } catch (err) {
         console.error("Failed to delete owner:", err);
