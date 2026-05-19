@@ -140,17 +140,13 @@ function PropertiesContent() {
         </div>
         <div className={styles.controls}>
           {(!user || user.role === 'Admin') && (
-            <>
-              <button className="btn btn-outline-light border text-dark d-flex align-items-center gap-2">
-                <i className="bi bi-map"></i> Map View
-              </button>
-              <button 
-                className="btn btn-primary d-flex align-items-center gap-2"
-                onClick={openAddModal}
-              >
-                <i className="bi bi-plus-lg"></i> Add Property
-              </button>
-            </>
+            <button 
+              className="btn btn-primary d-flex align-items-center gap-2 shadow-sm rounded-pill px-4"
+              onClick={openAddModal}
+              style={{ backgroundColor: '#10B981', borderColor: '#10B981', color: '#ffffff', fontWeight: 'bold' }}
+            >
+              <i className="bi bi-plus-lg"></i> Add Property
+            </button>
           )}
         </div>
       </div>
@@ -291,7 +287,7 @@ function PropertiesContent() {
                             </div>
                             <div className={styles.propInfo}>
                               <h6>{prop.propertyName}</h6>
-                              <p>{prop.location || prop.ownerAddress}</p>
+                              <p>{prop.propertyAddress || prop.location || prop.ownerAddress || 'N/A'}</p>
                             </div>
                           </div>
                         </Link>

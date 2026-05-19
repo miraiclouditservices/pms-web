@@ -43,7 +43,7 @@ export default function PropertyDetailPage({ params: paramsPromise }: { params: 
     
     const floors = [];
     // Start from top floor down to 0 (or basement)
-    for (let i = property.totalFloors; i >= 0; i--) {
+    for (let i = property.totalFloors || 0; i >= 0; i--) {
       const floorUnits = units.filter(u => u.floorNumber === i.toString() || u.floorNumber === `Floor ${i}`);
       floors.push({
         id: `f${i}`,

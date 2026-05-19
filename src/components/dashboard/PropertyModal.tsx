@@ -39,13 +39,15 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
         setFormData({
           propertyName: editData.propertyName || editData.name || "",
           propertyType: editData.propertyType || editData.type || "Office",
-          location: editData.location || "",
+          location: editData.propertyAddress || editData.location || "",
           region: editData.region || "APAC",
           status: editData.status || "Active",
           openingTime: editData.openingTime || "09:00",
           closingTime: editData.closingTime || "18:00"
         });
-        setTowers(editData.towerConfigs || [{ id: '1', name: 'Tower A', floors: 10, units: 100 }]);
+        setTowers(editData.towerConfigs && editData.towerConfigs.length > 0 
+          ? editData.towerConfigs 
+          : [{ id: '1', name: 'Tower A', floors: editData.totalFloors || 10, units: editData.totalUnits || 100 }]);
       } else {
         setFormData({
           propertyName: "",
@@ -86,7 +88,16 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
     await new Promise(resolve => setTimeout(resolve, 800));
     
     const totalUnits = towers.reduce((sum, t) => sum + t.units, 0);
-    onSave({ ...formData, towerConfigs: towers, towers: towers.length, totalUnits });
+    const totalFloors = Math.max(...towers.map(t => t.floors), 1);
+    
+    onSave({ 
+      ...formData, 
+      propertyAddress: formData.location, 
+      totalFloors, 
+      totalUnits, 
+      towerConfigs: towers, 
+      towers: towers.length 
+    });
     setIsSubmitting(false);
     onClose();
   };
