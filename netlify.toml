@@ -1,0 +1,8 @@
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[[redirects]]
+  from = "/admin/properties/*"
+  to = "/admin/properties/fallback/index.html"
+  status = 200
