@@ -1,8 +1,6 @@
 [build]
   command = "npm run build"
-  publish = "out"
+  publish = ".next"
 
-[[redirects]]
-  from = "/admin/properties/*"
-  to = "/admin/properties/fallback/index.html"
-  status = 200
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
