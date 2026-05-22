@@ -123,6 +123,34 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
         </div>
       </div>
 
+      {/* Property Occupancy Summary */}
+      <div className="row g-3 mb-4">
+        <div className="col-md-3">
+          <div className="bg-white rounded-xl shadow-sm border p-3">
+            <h6 className="text-muted small fw-bold mb-1">Total Area</h6>
+            <h3 className="fw-bold text-dark mb-0">{property?.totalSft?.toLocaleString() || 0} <span className="fs-6 text-muted fw-normal">SFT</span></h3>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="bg-emerald bg-opacity-10 rounded-xl shadow-sm border border-emerald border-opacity-25 p-3">
+            <h6 className="text-emerald small fw-bold mb-1">Occupied Area</h6>
+            <h3 className="fw-bold text-emerald mb-0">{property?.occupiedSft?.toLocaleString() || 0} <span className="fs-6 opacity-75 fw-normal">SFT</span></h3>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="bg-white rounded-xl shadow-sm border p-3">
+            <h6 className="text-muted small fw-bold mb-1">Available Area</h6>
+            <h3 className="fw-bold text-dark mb-0">{property?.availableSft?.toLocaleString() || 0} <span className="fs-6 text-muted fw-normal">SFT</span></h3>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="bg-primary bg-opacity-10 rounded-xl shadow-sm border border-primary border-opacity-25 p-3">
+            <h6 className="text-primary small fw-bold mb-1">Occupancy</h6>
+            <h3 className="fw-bold text-primary mb-0">{property?.occupancyPercentage || 0}%</h3>
+          </div>
+        </div>
+      </div>
+
       {/* Status Legend */}
       <div className="bg-white rounded-xl shadow-sm border p-4 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3" style={{ background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
         <div className="d-flex gap-4 align-items-center">

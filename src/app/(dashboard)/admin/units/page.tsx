@@ -70,9 +70,9 @@ function UnitsContent() {
                 <td className={styles.td}>
                    <div className="fw-bold">{unit.unitNumber}</div>
                 </td>
-                <td className={styles.td}>{unit.propertyId?.propertyName || 'Property'}</td>
+                <td className={styles.td}>{unit.property?.propertyName || unit.propertyId?.propertyName || 'Property'}</td>
                 <td className={styles.td}>{unit.floorNumber}</td>
-                <td className={styles.td}>{unit.squareFeet}</td>
+                <td className={styles.td}>{(unit.sqft || unit.squareFeet || 0).toLocaleString()}</td>
                 <td className={styles.td}>
                    <div className="small">
                       <div>Car: {unit.carParking}</div>

@@ -100,12 +100,13 @@ export default function LeasedParticularsPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveLease = (savedData: any) => {
+  const handleSaveLease = async (savedData: any): Promise<boolean> => {
     if (modalMode === 'create') {
       setLeases([savedData, ...leases]);
     } else if (modalMode === 'edit') {
       setLeases(leases.map(l => l.id === savedData.id ? savedData : l));
     }
+    return true;
   };
 
   const handleDelete = (id: string) => {

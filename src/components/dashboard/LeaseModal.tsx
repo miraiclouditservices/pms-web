@@ -6,7 +6,7 @@ import { api } from "@/utils/api";
 interface LeaseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<boolean>;
   editData?: any;
   mode?: "create" | "edit" | "view";
 }
@@ -14,13 +14,15 @@ interface LeaseModalProps {
 export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "create" }: LeaseModalProps) {
   const isView = mode === "view";
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allOwners, setAllOwners] = useState<any[]>([]);
+  const [allProperties, setAllProperties] = useState<any[]>([]);
   const [allUnits, setAllUnits] = useState<any[]>([]);
+  const [propertyStructure, setPropertyStructure] = useState<any>(null);
+  const [unitSearch, setUnitSearch] = useState("");
   const [formData, setFormData] = useState({
     tenantName: "",
     tenantContact: "",
     tenantEmail: "",
-    owner: "",
+    property: "",
     units: [] as string[],
     startDate: "",
     endDate: "",
@@ -35,16 +37,43 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
 
   const totalMonthly = (formData.monthlyRent || 0) + (formData.maintenanceCharges || 0);
 
+  const [calcParams, setCalcParams] = useState({
+    rentPerSft: 0,
+    camPerSft: 0,
+    depositMonths: 0
+  });
+
+  const allocatedSft = formData.units.reduce((sum, unitId) => {
+    const unit = allUnits.find(u => u._id === unitId);
+    return sum + (unit?.sqft || 0);
+  }, 0);
+
+  useEffect(() => {
+    if (!isView && !editData && (calcParams.rentPerSft > 0 || calcParams.camPerSft > 0 || calcParams.depositMonths > 0)) {
+      const monthlyRent = allocatedSft * calcParams.rentPerSft;
+      const maintenanceCharges = allocatedSft * calcParams.camPerSft;
+      const securityDeposit = monthlyRent * calcParams.depositMonths;
+      
+      setFormData(prev => ({
+        ...prev,
+        monthlyRent,
+        maintenanceCharges,
+        securityDeposit
+      }));
+    }
+  }, [allocatedSft, calcParams, isView, editData]);
+
   useEffect(() => {
     if (isOpen) {
-      fetchOwners();
+      setUnitSearch("");
+      fetchProperties();
       fetchUnits();
       if (editData) {
         setFormData({
           ...editData,
           startDate: editData.startDate ? new Date(editData.startDate).toISOString().split('T')[0] : "",
           endDate: editData.endDate ? new Date(editData.endDate).toISOString().split('T')[0] : "",
-          owner: typeof editData.owner === 'object' ? editData.owner._id : editData.owner,
+          property: typeof editData.property === 'object' ? editData.property._id : editData.property,
           units: editData.units?.map((u: any) => typeof u === 'object' ? u._id : u) || [],
           dueDay: editData.dueDay || 5
         });
@@ -53,7 +82,7 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
           tenantName: "",
           tenantContact: "",
           tenantEmail: "",
-          owner: "",
+          property: "",
           units: [],
           startDate: "",
           endDate: "",
@@ -69,16 +98,35 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
     }
   }, [editData, isOpen]);
 
-  const fetchOwners = async () => {
+  const fetchProperties = async () => {
     try {
-      const response = await api.get('/owners');
+      const response = await api.get('/properties');
       if (response.success) {
-        setAllOwners(response.data);
+        setAllProperties(response.data);
       }
     } catch (err) {
-      console.error("Failed to fetch owners:", err);
+      console.error("Failed to fetch properties:", err);
     }
   };
+
+  useEffect(() => {
+    const fetchStructure = async () => {
+      if (formData.property) {
+        try {
+          const response = await api.get(`/properties/${formData.property}/floors-units`);
+          if (response.success) {
+            setPropertyStructure(response.data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch property structure:", err);
+          setPropertyStructure(null);
+        }
+      } else {
+        setPropertyStructure(null);
+      }
+    };
+    fetchStructure();
+  }, [formData.property]);
 
   const fetchUnits = async () => {
     try {
@@ -104,10 +152,21 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.units.length === 0) {
+      alert("Please select at least one unit for this lease.");
+      return;
+    }
     setIsSubmitting(true);
-    await onSave(formData);
-    setIsSubmitting(false);
-    onClose();
+    try {
+      const success = await onSave(formData);
+      if (success) {
+        onClose();
+      }
+    } catch (err) {
+      console.error("Failed to save lease:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const [activeTab, setActiveTab] = useState<"agreement" | "payments">("agreement");
@@ -154,6 +213,8 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
       setIsRecordingPayment(false);
     }
   };
+
+
 
   if (!isOpen) return null;
 
@@ -284,8 +345,8 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
                           <i className="bi bi-building text-emerald"></i> Property & Ownership
                         </h6>
                         <div className="mb-3">
-                          <label className="text-muted small d-block mb-1">Assigned Property Owner</label>
-                          <div className="fw-bold text-dark">{typeof editData?.owner === 'object' ? editData.owner.ownerName : allOwners.find(o => o._id === formData.owner)?.ownerName || 'N/A'}</div>
+                          <label className="text-muted small d-block mb-1">Assigned Property</label>
+                          <div className="fw-bold text-dark">{typeof editData?.property === 'object' ? editData.property.propertyName : allProperties.find(p => p._id === formData.property)?.propertyName || 'N/A'}</div>
                         </div>
                         <div className="mb-0">
                           <label className="text-muted small d-block mb-1">Agreement Status</label>
@@ -299,16 +360,26 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
                     {/* Portfolio Context */}
                     <div className="col-md-6">
                       <div className="p-3 border rounded-4 h-100 bg-white shadow-sm">
-                        <h6 className="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
-                          <i className="bi bi-layout-text-window-reverse text-emerald"></i> Portfolio Context
+                        <h6 className="fw-bold text-dark mb-3 d-flex align-items-center justify-content-between gap-2">
+                          <span className="d-flex align-items-center gap-2">
+                            <i className="bi bi-layout-text-window-reverse text-emerald"></i> Portfolio Context
+                          </span>
+                          {editData?.units?.length > 0 && (
+                            <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 fw-bold" style={{ fontSize: '0.65rem' }}>
+                              Total Area: {editData.units.reduce((sum: number, u: any) => sum + (u.sqft || 0), 0).toLocaleString()} SFT
+                            </span>
+                          )}
                         </h6>
-                        <div className="overflow-auto" style={{ maxHeight: '100px' }}>
+                        <div className="overflow-auto" style={{ maxHeight: '120px' }}>
                           {editData?.units?.length > 0 ? (
                             editData.units.map((u: any, idx: number) => (
-                              <div key={idx} className="mb-2 p-2 bg-light rounded small">
-                                <span className="fw-bold text-dark">{u.unitNumber}</span>
-                                <span className="text-muted mx-2">|</span>
-                                <span className="text-muted">{u.property?.propertyName || u.property?.building || 'Main Block'} (Floor {u.floorNumber})</span>
+                              <div key={idx} className="mb-2 p-2 bg-light rounded small d-flex justify-content-between align-items-center">
+                                <div>
+                                  <span className="fw-bold text-dark">{u.unitNumber}</span>
+                                  <span className="text-muted mx-2">|</span>
+                                  <span className="text-muted">{u.property?.propertyName || u.property?.building || 'Main Block'} (Floor {u.floorNumber})</span>
+                                </div>
+                                <span className="fw-semibold text-primary" style={{ fontSize: '0.75rem' }}>{u.sqft || 0} SFT</span>
                               </div>
                             ))
                           ) : (
@@ -385,11 +456,11 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
                         value={formData.tenantName} onChange={(e) => setFormData({...formData, tenantName: e.target.value})} />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">Select Property Owner</label>
+                      <label className="form-label small fw-bold text-muted mb-1">Select Property</label>
                       <select className="form-select form-select-sm bg-light" required
-                        value={formData.owner} onChange={(e) => setFormData({...formData, owner: e.target.value})}>
-                        <option value="">Select Owner...</option>
-                        {allOwners.map(o => <option key={o._id} value={o._id}>{o.ownerName}</option>)}
+                        value={formData.property} onChange={(e) => setFormData({...formData, property: e.target.value, units: []})}>
+                        <option value="">Select Property...</option>
+                        {allProperties.map(p => <option key={p._id} value={p._id}>{p.propertyName}</option>)}
                       </select>
                     </div>
                     <div className="col-md-6">
@@ -404,6 +475,63 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
                     </div>
                   </div>
 
+                  {/* Property Hierarchy Display */}
+                  <div className="grouped-units-container mb-4">
+                    {propertyStructure ? (
+                      <div className="property-group mb-3 bg-white">
+                        {/* Property Header */}
+                        <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                          <span className="fw-bold text-dark fs-5 d-flex align-items-center gap-2">
+                            <i className="bi bi-building-fill text-emerald" style={{ color: '#10B981' }}></i> {propertyStructure.propertyName}
+                          </span>
+                        </div>
+                        
+                        {/* Floors List */}
+                        <div className="d-flex flex-column gap-4">
+                          {propertyStructure.floors && propertyStructure.floors.length > 0 ? propertyStructure.floors.map((floor: any, fIndex: number) => (
+                            <div key={fIndex} className="floor-row d-flex flex-column gap-2">
+                              {/* Floor Label */}
+                              <div className="fw-bold text-dark fs-6 pb-1" style={{ borderBottom: '1px dashed #e2e8f0' }}>
+                                {floor.floorName}
+                              </div>
+                              
+                              {/* Units List */}
+                              <div className="units-list d-flex flex-column gap-2 ms-3">
+                                {floor.units.map((unit: any) => {
+                                  const isSelected = formData.units.includes(unit.unitId);
+                                  return (
+                                    <div
+                                      key={unit.unitId}
+                                      onClick={() => toggleUnit(unit.unitId)}
+                                      className={`d-flex align-items-center gap-2 p-2 rounded-2 transition-all ${isSelected ? 'bg-emerald bg-opacity-10 border border-emerald' : 'hover-bg-light'}`}
+                                      style={{ cursor: 'pointer', border: isSelected ? '1px solid #10B981' : '1px solid transparent' }}
+                                    >
+                                      <i className="bi bi-circle-fill text-muted" style={{ fontSize: '0.4rem' }}></i>
+                                      <span className="fw-bold text-dark">Unit {unit.unitName}</span>
+                                      <i className="bi bi-arrow-right text-muted mx-1"></i>
+                                      <span className="text-muted fw-medium">{unit.sft || 0} SFT</span>
+                                      <i className="bi bi-arrow-right text-muted mx-1"></i>
+                                      <span className={`badge rounded-pill ${unit.status === 'Vacant' ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-muted'}`}>
+                                        {unit.status}
+                                      </span>
+                                      {isSelected && <i className="bi bi-check-circle-fill text-emerald ms-auto" style={{ color: '#10B981' }}></i>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )) : (
+                            <div className="text-muted small">No floors or units found for this property.</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="col-12 text-center py-4 text-muted small bg-light rounded-3 border border-dashed">
+                        {formData.property ? "Loading property structure..." : "Please select a property to view available floors and units."}
+                      </div>
+                    )}
+                  </div>
+
                   <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Financial Terms & Duration</h6>
                   <div className="row g-3 mb-4">
                     <div className="col-md-3">
@@ -416,20 +544,36 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
                       <input type="date" className="form-control form-control-sm bg-light" required
                         value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
                     </div>
+                    <div className="col-md-2">
+                      <label className="form-label small fw-bold text-muted mb-1">Rent / SFT</label>
+                      <input type="number" className="form-control form-control-sm bg-light"
+                        value={calcParams.rentPerSft || ''} onChange={(e) => setCalcParams({...calcParams, rentPerSft: Number(e.target.value)})} placeholder="Optional" />
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label small fw-bold text-muted mb-1">CAM / SFT</label>
+                      <input type="number" className="form-control form-control-sm bg-light"
+                        value={calcParams.camPerSft || ''} onChange={(e) => setCalcParams({...calcParams, camPerSft: Number(e.target.value)})} placeholder="Optional" />
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label small fw-bold text-muted mb-1">Deposit Months</label>
+                      <input type="number" className="form-control form-control-sm bg-light"
+                        value={calcParams.depositMonths || ''} onChange={(e) => setCalcParams({...calcParams, depositMonths: Number(e.target.value)})} placeholder="Optional" />
+                    </div>
+
                     <div className="col-md-3">
                       <label className="form-label small fw-bold text-muted mb-1">Monthly Rent</label>
                       <input type="number" className="form-control form-control-sm bg-light" required
                         value={formData.monthlyRent} onChange={(e) => setFormData({...formData, monthlyRent: Number(e.target.value)})} />
                     </div>
                     <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Maintenance</label>
+                      <label className="form-label small fw-bold text-muted mb-1">Maintenance (CAM)</label>
                       <input type="number" className="form-control form-control-sm bg-light"
                         value={formData.maintenanceCharges} onChange={(e) => setFormData({...formData, maintenanceCharges: Number(e.target.value)})} />
                     </div>
                     
                     <div className="col-md-3">
                       <label className="form-label small fw-bold text-dark mb-1">Total Monthly</label>
-                      <div className="form-control form-control-sm bg-emerald bg-opacity-10 fw-bold text-emerald border-emerald border-opacity-25">
+                      <div className="form-control form-control-sm fw-bold" style={{ backgroundColor: '#ecfdf5', color: '#10B981', borderColor: '#a7f3d0' }}>
                         ₹{totalMonthly.toLocaleString()}
                       </div>
                     </div>

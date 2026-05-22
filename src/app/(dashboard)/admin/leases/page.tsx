@@ -63,7 +63,7 @@ function LeasesContent() {
     }
   };
 
-  const handleSaveLease = async (data: any) => {
+  const handleSaveLease = async (data: any): Promise<boolean> => {
     try {
       let response;
       if (selectedLease && modalMode === 'edit') {
@@ -73,9 +73,15 @@ function LeasesContent() {
       }
       if (response.success) {
         fetchLeases(currentPage, search, filterStatus);
+        return true;
+      } else {
+        alert(response.error || "Failed to save lease.");
+        return false;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save lease:", err);
+      alert(err.response?.data?.error || err.message || "An unexpected error occurred while saving lease.");
+      return false;
     }
   };
 
