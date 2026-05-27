@@ -11,7 +11,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "Admin"
+    role: "Super Admin"
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,7 +50,7 @@ export default function RegisterPage() {
             email: "",
             password: "",
             confirmPassword: "",
-            role: "Admin"
+            role: "Super Admin"
           });
         }
       }
@@ -66,7 +66,7 @@ export default function RegisterPage() {
       {/* Brand Side */}
       <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-between p-5 position-relative overflow-hidden" 
            style={{ 
-             background: 'linear-gradient(135deg, #064E3B 0%, #10B981 100%)',
+             background: 'linear-gradient(135deg, #002855 0%, #014aad 100%)',
              color: 'white'
            }}>
         <div className="position-absolute top-0 start-0 w-100 h-100 opacity-20" style={{ 
@@ -76,7 +76,7 @@ export default function RegisterPage() {
 
         <div className="position-relative z-1">
           <div className="d-flex align-items-center gap-3 mb-5">
-            <div className="bg-white text-emerald rounded-circle d-flex align-items-center justify-content-center shadow-lg" style={{ width: '48px', height: '48px' }}>
+            <div className="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center shadow-lg" style={{ width: '48px', height: '48px' }}>
               <i className="bi bi-shield-check fs-4"></i>
             </div>
             <span className="fw-bold fs-4 tracking-tight">PMS GLOBAL</span>
@@ -168,7 +168,7 @@ export default function RegisterPage() {
               <div className="col-12">
                 <label className="form-label text-muted small fw-bold text-uppercase mb-1" style={{ fontSize: '0.6rem' }}>Account Role</label>
                 <div className="bg-light p-3 rounded shadow-sm border border-emerald border-opacity-25 d-flex align-items-center gap-3">
-                  <div className="bg-emerald bg-opacity-10 text-emerald rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
+                  <div className="bg-emerald bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
                     <i className="bi bi-shield-lock-fill"></i>
                   </div>
                   <div>
@@ -176,7 +176,7 @@ export default function RegisterPage() {
                     <p className="text-muted small mb-0" style={{ fontSize: '0.7rem' }}>Full access to all dashboard modules and user management.</p>
                   </div>
                 </div>
-                <input type="hidden" value="Admin" />
+                <input type="hidden" value="Super Admin" />
               </div>
             </div>
 
@@ -198,18 +198,18 @@ export default function RegisterPage() {
 
           <div className="text-center">
             <p className="text-muted small mb-0">
-              Already have an account? <Link href="/login" className="text-emerald fw-bold text-decoration-none">Log In</Link>
+              Already have an account? <Link href="/login" className="text-primary fw-bold text-decoration-none">Log In</Link>
             </p>
           </div>
         </div>
       </div>
 
       <style jsx global>{`
-        .bg-emerald { background-color: #10B981 !important; }
-        .text-emerald { color: #10B981 !important; }
-        .btn-emerald { background-color: #10B981; border: none; }
-        .btn-emerald:hover { background-color: #059669; transform: translateY(-1px); }
-        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
+        .bg-emerald { background-color: #014aad !important; }
+        .text-primary { color: #014aad !important; }
+        .btn-emerald { background-color: #014aad; border: none; }
+        .btn-emerald:hover { background-color: #013a8a; transform: translateY(-1px); }
+        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(1, 74, 173, 0.3); }
         .tracking-tight { letter-spacing: -0.02em; }
       `}</style>
     </div>

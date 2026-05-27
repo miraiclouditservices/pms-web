@@ -77,7 +77,7 @@ export default function Header() {
                 <p className="mb-0 fw-bold small" style={{ lineHeight: 1.2 }}>{displayName}</p>
                 <p className="mb-0 text-muted small" style={{ fontSize: '0.7rem' }}>{displayRole}</p>
               </div>
-              <div className={styles.actionButton} style={{ background: 'var(--bg-app)', fontWeight: 'bold', color: '#10B981', fontSize: '0.85rem' }}>
+              <div className={styles.actionButton} style={{ background: 'var(--bg-app)', fontWeight: 'bold', color: '#014aad', fontSize: '0.85rem' }}>
                 {avatarChar}
               </div>
             </div>

@@ -117,7 +117,7 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
           <button className="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-bold" style={{ fontSize: '0.75rem' }}>
             <i className="bi bi-download me-1"></i> Export Layout
           </button>
-          <button className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold" style={{ fontSize: '0.75rem', backgroundColor: '#10B981', border: 'none' }}>
+          <button className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold" style={{ fontSize: '0.75rem', backgroundColor: '#014aad', border: 'none' }}>
             <i className="bi bi-gear-fill me-1"></i> Property Settings
           </button>
         </div>
@@ -133,8 +133,8 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
         </div>
         <div className="col-md-3">
           <div className="bg-emerald bg-opacity-10 rounded-xl shadow-sm border border-emerald border-opacity-25 p-3">
-            <h6 className="text-emerald small fw-bold mb-1">Occupied Area</h6>
-            <h3 className="fw-bold text-emerald mb-0">{property?.occupiedSft?.toLocaleString() || 0} <span className="fs-6 opacity-75 fw-normal">SFT</span></h3>
+            <h6 className="text-primary small fw-bold mb-1">Occupied Area</h6>
+            <h3 className="fw-bold text-primary mb-0">{property?.occupiedSft?.toLocaleString() || 0} <span className="fs-6 opacity-75 fw-normal">SFT</span></h3>
           </div>
         </div>
         <div className="col-md-3">
@@ -156,7 +156,7 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
         <div className="d-flex gap-4 align-items-center">
             <div className="small fw-bold text-muted text-uppercase me-2" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Occupancy Status:</div>
             <div className="d-flex align-items-center gap-2">
-            <span className="badge rounded-circle p-1" style={{ width: '10px', height: '10px', backgroundColor: '#10B981', boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)' }}></span>
+            <span className="badge rounded-circle p-1" style={{ width: '10px', height: '10px', backgroundColor: '#014aad', boxShadow: '0 0 8px rgba(1, 74, 173, 0.4)' }}></span>
             <span className="fw-bold" style={{ fontSize: '0.75rem', color: '#334155' }}>Occupied</span>
             </div>
             <div className="d-flex align-items-center gap-2">
@@ -202,7 +202,7 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
                   setSelectedFloor(floor.name);
                   setIsUnitModalOpen(true);
                 }}
-                style={{ fontSize: '0.75rem', color: '#10B981' }}
+                style={{ fontSize: '0.75rem', color: '#014aad' }}
               >
                 <i className="bi bi-plus-lg me-1"></i> Add Units
               </button>
@@ -222,11 +222,11 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
                           setIsUnitModalOpen(true);
                       }}
                     >
-                      {unit.status === 'Occupied' && <div style={{ position: 'absolute', top: 0, right: 0, width: '40px', height: '40px', background: 'linear-gradient(135deg, transparent 50%, #10B981 50%)', opacity: 0.1 }}></div>}
+                      {unit.status === 'Occupied' && <div style={{ position: 'absolute', top: 0, right: 0, width: '40px', height: '40px', background: 'linear-gradient(135deg, transparent 50%, #014aad 50%)', opacity: 0.1 }}></div>}
                       <div className="d-flex justify-content-between align-items-start mb-2">
                         <span className="fw-bold text-dark" style={{ fontSize: '1rem', letterSpacing: '-0.02em' }}>{unit.id}</span>
                         <div className="d-flex gap-2 align-items-center">
-                            <div className={`rounded-circle d-flex align-items-center justify-content-center`} style={{ width: '24px', height: '24px', backgroundColor: unit.status === 'Occupied' ? '#10B98115' : '#e2e8f0' }}>
+                            <div className={`rounded-circle d-flex align-items-center justify-content-center`} style={{ width: '24px', height: '24px', backgroundColor: unit.status === 'Occupied' ? '#014aad15' : '#e2e8f0' }}>
                                 <i className={`bi ${unit.type === 'IT' ? 'bi-cpu-fill' : unit.type === 'Retail' ? 'bi-shop' : 'bi-briefcase-fill'} ${unit.status === 'Occupied' ? 'text-success' : 'text-muted'}`} style={{ fontSize: '0.7rem' }}></i>
                             </div>
                             <button className="btn btn-link p-0 text-muted shadow-none">
@@ -269,11 +269,11 @@ export default function PropertyDetailClient({ propertyId }: { propertyId: strin
       </div>
 
       <style jsx global>{`
-        .bg-success-light { background-color: rgba(16, 185, 129, 0.05); }
+        .bg-success-light { background-color: rgba(1, 74, 173, 0.05); }
         .bg-warning-light { background-color: rgba(245, 158, 11, 0.05); }
         .bg-info-light { background-color: rgba(59, 130, 246, 0.05); }
         .bg-danger-light { background-color: rgba(239, 68, 68, 0.05); }
-        .border-success { border-color: #10B981 !important; }
+        .border-success { border-color: #014aad !important; }
         .border-warning { border-color: #F59E0B !important; }
         .border-info { border-color: #3B82F6 !important; }
         .border-danger { border-color: #EF4444 !important; }

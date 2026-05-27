@@ -133,8 +133,8 @@ export default function UserModal({ isOpen, onClose, onSave, editData, mode }: U
               {mode === 'create' && (
                 <div className="mt-4 p-3 rounded-3 bg-emerald bg-opacity-10 border border-emerald border-opacity-25">
                     <div className="d-flex gap-2 align-items-center mb-1">
-                        <i className="bi bi-info-circle-fill text-emerald"></i>
-                        <span className="fw-bold text-emerald small">Notification Policy</span>
+                        <i className="bi bi-info-circle-fill text-primary"></i>
+                        <span className="fw-bold text-primary small">Notification Policy</span>
                     </div>
                     <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
                         User will receive an automated invitation to set their final credentials once access is provisioned.
@@ -154,7 +154,7 @@ export default function UserModal({ isOpen, onClose, onSave, editData, mode }: U
                 <button 
                   type="submit" className="btn btn-emerald-solid rounded-pill px-4 flex-grow-1 fw-bold text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem', height: '42px' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem', height: '42px' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

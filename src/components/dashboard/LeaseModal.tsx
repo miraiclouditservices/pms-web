@@ -13,59 +13,113 @@ interface LeaseModalProps {
 
 export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "create" }: LeaseModalProps) {
   const isView = mode === "view";
+  const [activeStep, setActiveStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allProperties, setAllProperties] = useState<any[]>([]);
   const [allUnits, setAllUnits] = useState<any[]>([]);
   const [propertyStructure, setPropertyStructure] = useState<any>(null);
-  const [unitSearch, setUnitSearch] = useState("");
+
+  // Upload previews
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [idProof, setIdProof] = useState<File | null>(null);
+  const [agreementFile, setAgreementFile] = useState<File | null>(null);
+
+  // Validation warnings
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Unified Form Data
   const [formData, setFormData] = useState({
     tenantName: "",
+    companyName: "",
+    tenantType: "Individual", // Individual, Company, Corporate
     tenantContact: "",
+    alternateContact: "",
     tenantEmail: "",
+    gstPan: "",
+    address: "",
+    emergencyContact: "",
+    remarks: "",
+
+    // Property & Space
     property: "",
+    floor: "",
     units: [] as string[],
+    assignedSft: 0,
+    officeStatus: "Vacant", // Vacant, Occupied, Reserved, Under Maintenance
+
+    // Lease Lifecycle
     startDate: "",
     endDate: "",
-    monthlyRent: 0,
-    securityDeposit: 0,
-    maintenanceCharges: 0,
-    escalationPercentage: 0,
-    dueDay: 5,
-    status: "Active",
-    remarks: ""
-  });
+    lockInPeriod: 6, // months
+    status: "Active", // Draft, Active, Expired, Terminated, Renewal Pending
+    renewalReminderDays: 30,
+    autoRenewal: false,
+    noticePeriod: 3, // months
 
-  const totalMonthly = (formData.monthlyRent || 0) + (formData.maintenanceCharges || 0);
-
-  const [calcParams, setCalcParams] = useState({
+    // Financial & Payment terms
     rentPerSft: 0,
     camPerSft: 0,
-    depositMonths: 0
+    parkingCharges: 0,
+    utilityCharges: 0,
+    maintenanceCharges: 0,
+    depositMonths: 2,
+    escalationPercentage: 5,
+    dueDay: 5,
+    taxPercentage: 18,
+    discountAmount: 0,
+    lateFeePercentage: 2,
+
+    monthlyRent: 0,
+    securityDeposit: 0,
+    totalMonthlyAmount: 0,
+
+    // Ledger Tracking
+    paidAmount: 0,
+    pendingAmount: 0,
+    overdueAmount: 0,
+    nextDueDate: "",
+    paymentStatus: "Pending" // Paid, Partial, Pending, Overdue
   });
 
-  const allocatedSft = formData.units.reduce((sum, unitId) => {
-    const unit = allUnits.find(u => u._id === unitId);
-    return sum + (unit?.sqft || 0);
-  }, 0);
-
+  // Calculate SFT and Financials automatically
   useEffect(() => {
-    if (!isView && !editData && (calcParams.rentPerSft > 0 || calcParams.camPerSft > 0 || calcParams.depositMonths > 0)) {
-      const monthlyRent = allocatedSft * calcParams.rentPerSft;
-      const maintenanceCharges = allocatedSft * calcParams.camPerSft;
-      const securityDeposit = monthlyRent * calcParams.depositMonths;
-      
-      setFormData(prev => ({
-        ...prev,
-        monthlyRent,
-        maintenanceCharges,
-        securityDeposit
-      }));
-    }
-  }, [allocatedSft, calcParams, isView, editData]);
+    const totalSft = formData.units.reduce((sum, unitId) => {
+      const unit = allUnits.find(u => u._id === unitId);
+      return sum + (unit?.sqft || 0);
+    }, 0);
 
+    const monthlyRent = totalSft * (formData.rentPerSft || 0);
+    const camCharges = totalSft * (formData.camPerSft || 0);
+    const securityDeposit = monthlyRent * (formData.depositMonths || 0);
+
+    const recurringBase = monthlyRent + camCharges + (formData.utilityCharges || 0) + (formData.parkingCharges || 0);
+    const taxAmount = (recurringBase * (formData.taxPercentage || 0)) / 100;
+    const totalMonthlyAmount = recurringBase + taxAmount - (formData.discountAmount || 0);
+
+    setFormData(prev => ({
+      ...prev,
+      assignedSft: totalSft,
+      monthlyRent: Math.round(monthlyRent),
+      maintenanceCharges: Math.round(camCharges),
+      securityDeposit: Math.round(securityDeposit),
+      totalMonthlyAmount: Math.round(totalMonthlyAmount)
+    }));
+  }, [
+    formData.units,
+    formData.rentPerSft,
+    formData.camPerSft,
+    formData.depositMonths,
+    formData.utilityCharges,
+    formData.parkingCharges,
+    formData.taxPercentage,
+    formData.discountAmount,
+    allUnits
+  ]);
+
+  // Fetch properties and units on open
   useEffect(() => {
     if (isOpen) {
-      setUnitSearch("");
+      setActiveStep(1);
       fetchProperties();
       fetchUnits();
       if (editData) {
@@ -73,26 +127,58 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
           ...editData,
           startDate: editData.startDate ? new Date(editData.startDate).toISOString().split('T')[0] : "",
           endDate: editData.endDate ? new Date(editData.endDate).toISOString().split('T')[0] : "",
+          nextDueDate: editData.nextDueDate ? new Date(editData.nextDueDate).toISOString().split('T')[0] : "",
           property: typeof editData.property === 'object' ? editData.property._id : editData.property,
+          floor: typeof editData.floor === 'object' ? editData.floor._id : editData.floor,
           units: editData.units?.map((u: any) => typeof u === 'object' ? u._id : u) || [],
-          dueDay: editData.dueDay || 5
+          dueDay: editData.dueDay || 5,
+          lockInPeriod: editData.lockInPeriod || 6,
+          noticePeriod: editData.noticePeriod || 3,
+          tenantType: editData.tenantType || "Individual"
         });
       } else {
         setFormData({
           tenantName: "",
+          companyName: "",
+          tenantType: "Individual",
           tenantContact: "",
+          alternateContact: "",
           tenantEmail: "",
+          gstPan: "",
+          address: "",
+          emergencyContact: "",
+          remarks: "",
           property: "",
+          floor: "",
           units: [],
+          assignedSft: 0,
+          officeStatus: "Vacant",
           startDate: "",
           endDate: "",
+          lockInPeriod: 6,
+          status: "Active",
+          renewalReminderDays: 30,
+          autoRenewal: false,
+          noticePeriod: 3,
+          rentPerSft: 0,
+          camPerSft: 0,
+          parkingCharges: 0,
+          utilityCharges: 0,
+          maintenanceCharges: 0,
+          depositMonths: 2,
+          escalationPercentage: 5,
+          dueDay: 5,
+          taxPercentage: 18,
+          discountAmount: 0,
+          lateFeePercentage: 2,
           monthlyRent: 0,
           securityDeposit: 0,
-          maintenanceCharges: 0,
-          escalationPercentage: 0,
-          dueDay: 5,
-          status: "Active",
-          remarks: ""
+          totalMonthlyAmount: 0,
+          paidAmount: 0,
+          pendingAmount: 0,
+          overdueAmount: 0,
+          nextDueDate: "",
+          paymentStatus: "Pending"
         });
       }
     }
@@ -142,23 +228,78 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
   const toggleUnit = (unitId: string) => {
     const current = [...formData.units];
     const index = current.indexOf(unitId);
+    let floorId = formData.floor;
+
     if (index > -1) {
       current.splice(index, 1);
     } else {
       current.push(unitId);
+      const selectedUnit = allUnits.find(u => u._id === unitId);
+      if (selectedUnit) {
+        floorId = typeof selectedUnit.floor === 'object' ? selectedUnit.floor._id : selectedUnit.floor;
+      }
     }
-    setFormData({ ...formData, units: current });
+    setFormData({ ...formData, units: current, floor: floorId });
+  };
+
+  const validateStep = (step: number) => {
+    const errs: Record<string, string> = {};
+    if (step === 1) {
+      if (!formData.tenantName) errs.tenantName = "Holder Name is required.";
+      if (!formData.tenantContact) errs.tenantContact = "Contact Number is required.";
+      else if (!/^[0-9]{10}$/.test(formData.tenantContact)) errs.tenantContact = "Mobile number must be 10 digits.";
+      if (!formData.tenantEmail) errs.tenantEmail = "Email ID is required.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.tenantEmail)) errs.tenantEmail = "Invalid Email format.";
+      if (!formData.address) errs.address = "Address is required.";
+      if (formData.gstPan) {
+        const panGstRegex = /^([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})|([A-Z]{5}[0-9]{4}[A-Z]{1})$/;
+        if (!panGstRegex.test(formData.gstPan.toUpperCase())) errs.gstPan = "Invalid GST/PAN format.";
+      }
+    } else if (step === 2) {
+      if (!formData.property) errs.property = "Property must be selected.";
+      if (formData.units.length === 0) errs.units = "At least one unit must be linked.";
+      
+      // Prevent over-allocation of SFT
+      const selectedFloorObj = propertyStructure?.floors?.find((f: any) => f.floorId === formData.floor);
+      const floorTotalSft = selectedFloorObj?.totalSft || 0;
+      if (floorTotalSft > 0 && formData.assignedSft > floorTotalSft) {
+        errs.units = "Assigned SFT exceeds total floor capacity.";
+      }
+    } else if (step === 3) {
+      if (!formData.startDate) errs.startDate = "Start Date is required.";
+      if (!formData.endDate) errs.endDate = "End Date is required.";
+      else {
+        const start = new Date(formData.startDate);
+        const end = new Date(formData.endDate);
+        if (end <= start) errs.endDate = "End date must exceed start date.";
+      }
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateStep(activeStep)) {
+      setActiveStep(prev => prev + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    setActiveStep(prev => Math.max(1, prev - 1));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.units.length === 0) {
-      alert("Please select at least one unit for this lease.");
-      return;
-    }
+    if (!validateStep(activeStep)) return;
     setIsSubmitting(true);
     try {
-      const success = await onSave(formData);
+      const payload = {
+        ...formData,
+        profilePhotoUrl: profilePhoto ? profilePhoto.name : "",
+        idProofUrl: idProof ? idProof.name : "",
+        agreementUrl: agreementFile ? agreementFile.name : ""
+      };
+      const success = await onSave(payload);
       if (success) {
         onClose();
       }
@@ -169,611 +310,612 @@ export default function LeaseModal({ isOpen, onClose, onSave, editData, mode = "
     }
   };
 
-  const [activeTab, setActiveTab] = useState<"agreement" | "payments">("agreement");
-  const [payments, setPayments] = useState<any[]>([]);
-  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
-  const [newPayment, setNewPayment] = useState({
-    month: new Date().toLocaleString('default', { month: 'long' }),
-    year: new Date().getFullYear(),
-    amount: totalMonthly,
-    paymentMethod: 'Online',
-    status: 'Paid',
-    remarks: ''
-  });
-
-  useEffect(() => {
-    if (isOpen && editData) {
-      fetchPayments();
-    }
-  }, [editData, isOpen]);
-
-  const fetchPayments = async () => {
-    try {
-      const response = await api.get(`/payments?lease=${editData._id}`);
-      if (response.success) {
-        setPayments(response.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch payments:", err);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Active": return "#10b981"; // Green
+      case "Pending": return "#f59e0b"; // Yellow
+      case "Expired": return "#ef4444"; // Red
+      case "Renewal Pending": return "#3b82f6"; // Blue
+      default: return "#6b7280";
     }
   };
 
-  const handleRecordPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsRecordingPayment(true);
-    try {
-      const response = await api.post('/payments', { ...newPayment, lease: editData._id });
-      if (response.success) {
-        fetchPayments();
-        setIsRecordingPayment(false);
-        setNewPayment({ ...newPayment, month: 'January', remarks: '' }); // Reset
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to record payment");
-      setIsRecordingPayment(false);
-    }
-  };
+  // Calculations for Step 2
+  const selectedFloorObj = propertyStructure?.floors?.find((f: any) => f.floorId === formData.floor);
+  const totalFloorSft = selectedFloorObj?.totalSft || 0;
+  const remainingFloorSft = Math.max(0, totalFloorSft - formData.assignedSft);
 
-
+  // Available vacant units on selected floor
+  const availableUnitsOnFloor = selectedFloorObj?.units?.filter((u: any) => u.status === 'Vacant' || u.status === 'Available') || [];
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" style={{
+    <div className="modal-overlay animate-fadeIn" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(2, 44, 34, 0.7)', display: 'flex',
+      backgroundColor: 'rgba(15, 23, 42, 0.75)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-      backdropFilter: 'blur(10px)', animation: 'fadeIn 0.3s ease-out'
+      backdropFilter: 'blur(12px)'
     }}>
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-overlay { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .modal-container { animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
       
-      <div className="modal-dialog modal-lg w-100 mx-3" style={{ maxWidth: '900px', animation: 'slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-        <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden bg-white">
-          <div className="modal-header border-bottom p-0 bg-light flex-column align-items-stretch">
-            <div className="d-flex justify-content-between align-items-start p-4 pb-2">
-              <div>
-                <h5 className="modal-title fw-bold text-dark mb-1">
-                  {isView ? 'Audit Lease Agreement' : editData ? 'Update Lease Portfolio' : 'Register New Lease'}
-                </h5>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="text-muted small fw-medium">Ref ID: {editData?._id?.substring(0, 8).toUpperCase() || 'NEW'}</span>
-                  {editData?.units?.length > 0 && (
-                    <span className="badge bg-emerald bg-opacity-10 text-emerald border border-emerald border-opacity-25 rounded-pill px-3 py-1 fw-bold" style={{ fontSize: '0.7rem' }}>
-                      <i className="bi bi-door-open-fill me-1"></i>
-                      {editData.units[0].unitNumber} 
-                      {editData.units.length > 1 ? ` (+${editData.units.length - 1} Units)` : ' (Main Office)'}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button type="button" className="btn-close shadow-none" onClick={onClose}></button>
-            </div>
-            
-            {/* Tabs Navigation */}
-            <div className="px-4 d-flex gap-4">
-              <button 
-                className={`btn btn-link text-decoration-none px-0 py-3 fw-bold border-bottom border-3 transition-all ${activeTab === 'agreement' ? 'text-emerald border-emerald' : 'text-muted border-transparent opacity-50'}`}
-                onClick={() => setActiveTab('agreement')}
-                style={{ fontSize: '0.9rem' }}
-              >
-                Agreement Details
-              </button>
-              {editData && (
-                <button 
-                  className={`btn btn-link text-decoration-none px-0 py-3 fw-bold border-bottom border-3 transition-all ${activeTab === 'payments' ? 'text-emerald border-emerald' : 'text-muted border-transparent opacity-50'}`}
-                  onClick={() => setActiveTab('payments')}
-                  style={{ fontSize: '0.9rem' }}
-                >
-                  Payment History & Recording
-                </button>
-              )}
-            </div>
-          </div>
+      <div className="modal-container w-100 mx-3" style={{ maxWidth: '1140px' }}>
+        <div className="modal-content border-0 rounded-4 shadow-2xl overflow-hidden bg-white d-flex flex-column" style={{ height: '90vh' }}>
           
-          <div className="modal-body p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-            {activeTab === 'agreement' ? (
-              isView ? (
-                <div className="view-mode-content animate-fadeIn">
-                  {/* Header Highlights */}
-                  <div className="row g-4 mb-4">
-                    <div className="col-md-7">
-                      <div className="bg-emerald bg-opacity-10 p-4 rounded-4 border border-emerald border-opacity-25 shadow-sm">
-                        <div className="d-flex align-items-center gap-3 mb-2">
-                          <div className="bg-emerald text-white rounded-circle d-flex align-items-center justify-content-center shadow" style={{ width: '48px', height: '48px' }}>
-                            <i className="bi bi-person-check-fill fs-4"></i>
-                          </div>
-                          <div>
-                            <h4 className="fw-bold mb-0 text-dark">{formData.tenantName || 'N/A'}</h4>
-                            <span className="text-muted small fw-medium">Primary Lease Holder</span>
-                          </div>
-                        </div>
-                        <div className="d-flex gap-4 mt-3 pt-2 border-top border-emerald border-opacity-10">
-                          <div className="small"><i className="bi bi-telephone-fill text-emerald me-2"></i><strong>{formData.tenantContact || 'N/A'}</strong></div>
-                          <div className="small"><i className="bi bi-envelope-at-fill text-emerald me-2"></i><strong>{formData.tenantEmail || 'N/A'}</strong></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-5">
-                      <div className="bg-light p-4 rounded-4 border shadow-sm text-center d-flex flex-column justify-content-center h-100">
-                        <span className="text-muted small fw-bold text-uppercase mb-1" style={{ letterSpacing: '0.05em' }}>Total Monthly Payment</span>
-                        <h2 className="fw-bold text-emerald mb-0" style={{ fontSize: '2rem' }}>₹{totalMonthly.toLocaleString()}</h2>
-                        <div className="badge bg-warning bg-opacity-25 text-warning rounded-pill mt-2 py-2 px-3 fw-bold mx-auto" style={{ fontSize: '0.7rem' }}>
-                          <i className="bi bi-calendar-event me-2"></i>Due on {formData.dueDay}th of each month
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+          {/* Header */}
+          <div className="modal-header border-bottom px-4 py-3 bg-light d-flex justify-content-between align-items-center flex-shrink-0">
+            <div>
+              <div className="d-flex align-items-center gap-2">
+                <span className="badge text-white font-semibold py-1 px-3 rounded-pill" style={{ backgroundColor: '#014aad' }}>Step {activeStep} of 4</span>
+                <span className="text-muted small">| {isView ? 'Lease Profile Review' : editData ? 'Edit Agreement' : 'New Tenant Registry'}</span>
+              </div>
+              <h5 className="modal-title fw-bold text-dark mt-1">
+                {activeStep === 1 && "Personal & Entity Profile"}
+                {activeStep === 2 && "Property & Space Allocation"}
+                {activeStep === 3 && "Lease Duration & Financial Settings"}
+                {activeStep === 4 && "Agreement Documents & Remarks"}
+              </h5>
+            </div>
+            <button type="button" className="btn-close shadow-none" onClick={onClose}></button>
+          </div>
 
-                  <div className="row g-4">
-                    {/* Monthly Obligation Summary */}
-                    <div className="col-12">
-                      <div className="p-4 rounded-4 border-emerald border-opacity-25 bg-emerald bg-opacity-5 shadow-sm text-center">
-                        <h6 className="fw-bold text-dark mb-4 text-uppercase small" style={{ letterSpacing: '0.1em' }}>
-                          <i className="bi bi-receipt-cutoff me-2 text-emerald"></i> Monthly Financial Obligation
-                        </h6>
-                        <div className="d-flex align-items-center justify-content-center gap-4 flex-wrap">
-                          <div className="text-center">
-                            <label className="text-muted small d-block mb-1">Base Monthly Rent</label>
-                            <div className="fw-bold fs-5 text-dark">₹{formData.monthlyRent.toLocaleString()}</div>
-                          </div>
-                          <div className="fs-3 text-muted opacity-50">+</div>
-                          <div className="text-center">
-                            <label className="text-muted small d-block mb-1">Maintenance Fees</label>
-                            <div className="fw-bold fs-5 text-dark">₹{formData.maintenanceCharges.toLocaleString()}</div>
-                          </div>
-                          <div className="fs-3 text-emerald">=</div>
-                          <div className="text-center bg-white p-3 rounded-4 border border-emerald px-5 shadow-sm">
-                            <label className="text-emerald small fw-bold d-block mb-1 text-uppercase">Total Recurring Monthly</label>
-                            <div className="fw-bold fs-2 text-emerald">₹{totalMonthly.toLocaleString()}</div>
-                          </div>
-                        </div>
-                        <div className="mt-4 pt-3 border-top border-emerald border-opacity-10">
-                          <span className="text-muted small">
-                            <i className="bi bi-info-circle me-2"></i> This payment is due on the <strong>{formData.dueDay}th</strong> of every month throughout the lease tenure.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Property & Ownership */}
-                    <div className="col-md-6">
-                      <div className="p-3 border rounded-4 h-100 bg-white shadow-sm">
-                        <h6 className="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
-                          <i className="bi bi-building text-emerald"></i> Property & Ownership
-                        </h6>
-                        <div className="mb-3">
-                          <label className="text-muted small d-block mb-1">Assigned Property</label>
-                          <div className="fw-bold text-dark">{typeof editData?.property === 'object' ? editData.property.propertyName : allProperties.find(p => p._id === formData.property)?.propertyName || 'N/A'}</div>
-                        </div>
-                        <div className="mb-0">
-                          <label className="text-muted small d-block mb-1">Agreement Status</label>
-                          <span className={`badge rounded-pill px-3 py-2 fw-bold ${formData.status === 'Active' ? 'bg-success bg-opacity-10 text-success border border-success' : 'bg-warning bg-opacity-10 text-warning border border-warning'}`}>
-                            {formData.status === 'Active' ? 'Active Agreement' : formData.status === 'Pending' ? 'Pending Signature' : 'Terminated'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Portfolio Context */}
-                    <div className="col-md-6">
-                      <div className="p-3 border rounded-4 h-100 bg-white shadow-sm">
-                        <h6 className="fw-bold text-dark mb-3 d-flex align-items-center justify-content-between gap-2">
-                          <span className="d-flex align-items-center gap-2">
-                            <i className="bi bi-layout-text-window-reverse text-emerald"></i> Portfolio Context
-                          </span>
-                          {editData?.units?.length > 0 && (
-                            <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 fw-bold" style={{ fontSize: '0.65rem' }}>
-                              Total Area: {editData.units.reduce((sum: number, u: any) => sum + (u.sqft || 0), 0).toLocaleString()} SFT
-                            </span>
-                          )}
-                        </h6>
-                        <div className="overflow-auto" style={{ maxHeight: '120px' }}>
-                          {editData?.units?.length > 0 ? (
-                            editData.units.map((u: any, idx: number) => (
-                              <div key={idx} className="mb-2 p-2 bg-light rounded small d-flex justify-content-between align-items-center">
-                                <div>
-                                  <span className="fw-bold text-dark">{u.unitNumber}</span>
-                                  <span className="text-muted mx-2">|</span>
-                                  <span className="text-muted">{u.property?.propertyName || u.property?.building || 'Main Block'} (Floor {u.floorNumber})</span>
-                                </div>
-                                <span className="fw-semibold text-primary" style={{ fontSize: '0.75rem' }}>{u.sqft || 0} SFT</span>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-muted small">No units interlinked to this lease.</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Agreement Terms */}
-                    <div className="col-md-12">
-                      <div className="p-3 border rounded-4 bg-white shadow-sm">
-                        <h6 className="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
-                          <i className="bi bi-calendar-range text-emerald"></i> Lease Duration & Timeline
-                        </h6>
-                        <div className="row g-3">
-                          <div className="col-md-6">
-                            <label className="text-muted small d-block mb-1">Agreement Start Date</label>
-                            <div className="fw-bold text-dark bg-light p-2 rounded">{formData.startDate ? new Date(formData.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A'}</div>
-                          </div>
-                          <div className="col-md-6">
-                            <label className="text-muted small d-block mb-1">Agreement End Date</label>
-                            <div className="fw-bold text-dark bg-light p-2 rounded">{formData.endDate ? new Date(formData.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A'}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Detailed Finances */}
-                    <div className="col-12">
-                      <div className="p-4 border rounded-4 bg-white shadow-sm">
-                        <h6 className="fw-bold text-dark mb-4 d-flex align-items-center gap-2">
-                          <i className="bi bi-cash-stack text-emerald"></i> Financial Breakdown
-                        </h6>
-                        <div className="row g-4 text-center">
-                          <div className="col-md-3 border-end">
-                            <label className="text-muted small d-block mb-1">Base Monthly Rent</label>
-                            <div className="fw-bold fs-5">₹{formData.monthlyRent.toLocaleString()}</div>
-                          </div>
-                          <div className="col-md-3 border-end">
-                            <label className="text-muted small d-block mb-1">Maintenance Charges</label>
-                            <div className="fw-bold fs-5">₹{formData.maintenanceCharges.toLocaleString()}</div>
-                          </div>
-                          <div className="col-md-3 border-end">
-                            <label className="text-muted small d-block mb-1">Security Deposit</label>
-                            <div className="fw-bold fs-5 text-dark">₹{formData.securityDeposit.toLocaleString()}</div>
-                          </div>
-                          <div className="col-md-3">
-                            <label className="text-muted small d-block mb-1">Annual Escalation</label>
-                            <div className="fw-bold fs-5 text-primary">{formData.escalationPercentage}%</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Remarks */}
-                    {formData.remarks && (
-                      <div className="col-12">
-                        <div className="p-3 bg-light rounded-4 border">
-                          <label className="text-muted small fw-bold d-block mb-1">Additional Remarks / Special Clauses</label>
-                          <p className="mb-0 text-muted small fw-medium">{formData.remarks}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
+          {/* Core Body: Form Wizard & Sticky Preview Sidebar */}
+          <div className="modal-body p-0 d-flex flex-grow-1 overflow-hidden">
+            <div className="row g-0 w-100 h-100">
+              
+              {/* Form Wizard Left Panel */}
+              <div className="col-lg-8 p-4 overflow-auto h-100">
                 <form onSubmit={handleSubmit}>
-                  <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Tenant & Owner Relationship</h6>
-                  <div className="row g-3 mb-4">
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">Tenant / Lease Holder Name</label>
-                      <input type="text" className="form-control form-control-sm bg-light" required
-                        value={formData.tenantName} onChange={(e) => setFormData({...formData, tenantName: e.target.value})} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">Select Property</label>
-                      <select className="form-select form-select-sm bg-light" required
-                        value={formData.property} onChange={(e) => setFormData({...formData, property: e.target.value, units: []})}>
-                        <option value="">Select Property...</option>
-                        {allProperties.map(p => <option key={p._id} value={p._id}>{p.propertyName}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">Tenant Contact Number</label>
-                      <input type="text" className="form-control form-control-sm bg-light" required
-                        value={formData.tenantContact} onChange={(e) => setFormData({...formData, tenantContact: e.target.value})} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">Tenant Email ID</label>
-                      <input type="email" className="form-control form-control-sm bg-light"
-                        value={formData.tenantEmail} onChange={(e) => setFormData({...formData, tenantEmail: e.target.value})} />
-                    </div>
-                  </div>
+                  
+                  {/* Step 1: Personal details */}
+                  {activeStep === 1 && (
+                    <div className="step-content">
+                      <div className="p-3 bg-light rounded-3 mb-4 border-start border-4 border-primary">
+                        <h6 className="fw-bold mb-1 text-dark">Tenant & Co-Signer Information</h6>
+                        <p className="text-muted small mb-0">Fill in the professional organization details and legal entity identity fields below.</p>
+                      </div>
 
-                  {/* Property Hierarchy Display */}
-                  <div className="grouped-units-container mb-4">
-                    {propertyStructure ? (
-                      <div className="property-group mb-3 bg-white">
-                        {/* Property Header */}
-                        <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
-                          <span className="fw-bold text-dark fs-5 d-flex align-items-center gap-2">
-                            <i className="bi bi-building-fill text-emerald" style={{ color: '#10B981' }}></i> {propertyStructure.propertyName}
-                          </span>
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Lease Holder / Tenant Name *</label>
+                          <input type="text" className={`form-control shadow-none ${errors.tenantName ? 'is-invalid' : ''}`} required disabled={isView}
+                            value={formData.tenantName} onChange={(e) => setFormData({...formData, tenantName: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.tenantName && <div className="invalid-feedback">{errors.tenantName}</div>}
                         </div>
-                        
-                        {/* Floors List */}
-                        <div className="d-flex flex-column gap-4">
-                          {propertyStructure.floors && propertyStructure.floors.length > 0 ? propertyStructure.floors.map((floor: any, fIndex: number) => (
-                            <div key={fIndex} className="floor-row d-flex flex-column gap-2">
-                              {/* Floor Label */}
-                              <div className="fw-bold text-dark fs-6 pb-1" style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                {floor.floorName}
-                              </div>
-                              
-                              {/* Units List */}
-                              <div className="units-list d-flex flex-column gap-2 ms-3">
-                                {floor.units.map((unit: any) => {
-                                  const isSelected = formData.units.includes(unit.unitId);
-                                  return (
-                                    <div
-                                      key={unit.unitId}
-                                      onClick={() => toggleUnit(unit.unitId)}
-                                      className={`d-flex align-items-center gap-2 p-2 rounded-2 transition-all ${isSelected ? 'bg-emerald bg-opacity-10 border border-emerald' : 'hover-bg-light'}`}
-                                      style={{ cursor: 'pointer', border: isSelected ? '1px solid #10B981' : '1px solid transparent' }}
-                                    >
-                                      <i className="bi bi-circle-fill text-muted" style={{ fontSize: '0.4rem' }}></i>
-                                      <span className="fw-bold text-dark">Unit {unit.unitName}</span>
-                                      <i className="bi bi-arrow-right text-muted mx-1"></i>
-                                      <span className="text-muted fw-medium">{unit.sft || 0} SFT</span>
-                                      <i className="bi bi-arrow-right text-muted mx-1"></i>
-                                      <span className={`badge rounded-pill ${unit.status === 'Vacant' ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-muted'}`}>
-                                        {unit.status}
-                                      </span>
-                                      {isSelected && <i className="bi bi-check-circle-fill text-emerald ms-auto" style={{ color: '#10B981' }}></i>}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )) : (
-                            <div className="text-muted small">No floors or units found for this property.</div>
-                          )}
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Company / Organization Name</label>
+                          <input type="text" className="form-control shadow-none" disabled={isView}
+                            value={formData.companyName} onChange={(e) => setFormData({...formData, companyName: e.target.value})} style={{ borderRadius: '6px' }} />
                         </div>
-                      </div>
-                    ) : (
-                      <div className="col-12 text-center py-4 text-muted small bg-light rounded-3 border border-dashed">
-                        {formData.property ? "Loading property structure..." : "Please select a property to view available floors and units."}
-                      </div>
-                    )}
-                  </div>
-
-                  <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Financial Terms & Duration</h6>
-                  <div className="row g-3 mb-4">
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Start Date</label>
-                      <input type="date" className="form-control form-control-sm bg-light" required
-                        value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
-                    </div>
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">End Date</label>
-                      <input type="date" className="form-control form-control-sm bg-light" required
-                        value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
-                    </div>
-                    <div className="col-md-2">
-                      <label className="form-label small fw-bold text-muted mb-1">Rent / SFT</label>
-                      <input type="number" className="form-control form-control-sm bg-light"
-                        value={calcParams.rentPerSft || ''} onChange={(e) => setCalcParams({...calcParams, rentPerSft: Number(e.target.value)})} placeholder="Optional" />
-                    </div>
-                    <div className="col-md-2">
-                      <label className="form-label small fw-bold text-muted mb-1">CAM / SFT</label>
-                      <input type="number" className="form-control form-control-sm bg-light"
-                        value={calcParams.camPerSft || ''} onChange={(e) => setCalcParams({...calcParams, camPerSft: Number(e.target.value)})} placeholder="Optional" />
-                    </div>
-                    <div className="col-md-2">
-                      <label className="form-label small fw-bold text-muted mb-1">Deposit Months</label>
-                      <input type="number" className="form-control form-control-sm bg-light"
-                        value={calcParams.depositMonths || ''} onChange={(e) => setCalcParams({...calcParams, depositMonths: Number(e.target.value)})} placeholder="Optional" />
-                    </div>
-
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Monthly Rent</label>
-                      <input type="number" className="form-control form-control-sm bg-light" required
-                        value={formData.monthlyRent} onChange={(e) => setFormData({...formData, monthlyRent: Number(e.target.value)})} />
-                    </div>
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Maintenance (CAM)</label>
-                      <input type="number" className="form-control form-control-sm bg-light"
-                        value={formData.maintenanceCharges} onChange={(e) => setFormData({...formData, maintenanceCharges: Number(e.target.value)})} />
-                    </div>
-                    
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-dark mb-1">Total Monthly</label>
-                      <div className="form-control form-control-sm fw-bold" style={{ backgroundColor: '#ecfdf5', color: '#10B981', borderColor: '#a7f3d0' }}>
-                        ₹{totalMonthly.toLocaleString()}
-                      </div>
-                    </div>
-
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Rent Due Day</label>
-                      <input type="number" className="form-control form-control-sm bg-light" min="1" max="31" required
-                        value={formData.dueDay} onChange={(e) => setFormData({...formData, dueDay: Number(e.target.value)})} />
-                    </div>
-
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Security Deposit</label>
-                      <input type="number" className="form-control form-control-sm bg-light"
-                        value={formData.securityDeposit} onChange={(e) => setFormData({...formData, securityDeposit: Number(e.target.value)})} />
-                    </div>
-                    <div className="col-md-3">
-                      <label className="form-label small fw-bold text-muted mb-1">Escalation (%)</label>
-                      <input type="number" className="form-control form-control-sm bg-light"
-                        value={formData.escalationPercentage} onChange={(e) => setFormData({...formData, escalationPercentage: Number(e.target.value)})} />
-                    </div>
-                    
-                    <div className="col-md-12">
-                      <label className="form-label small fw-bold text-muted mb-1">Agreement Status</label>
-                      <select className="form-select form-select-sm bg-light rounded-pill px-3"
-                        value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-                        <option value="Active">Active Agreement</option>
-                        <option value="Pending">Pending Signature</option>
-                        <option value="Terminated">Agreement Terminated</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="col-md-12">
-                    <label className="form-label small fw-bold text-muted mb-1">Additional Remarks</label>
-                    <textarea className="form-control form-control-sm bg-light" rows={2}
-                      value={formData.remarks} onChange={(e) => setFormData({...formData, remarks: e.target.value})}></textarea>
-                  </div>
-                </form>
-              )
-            ) : (
-              <div className="payments-tab-content animate-fadeIn">
-                <div className="row g-4">
-                  {/* Record Payment Form */}
-                  {!isView && (
-                    <div className="col-md-5">
-                      <div className="p-4 border border-emerald border-opacity-10 rounded-4 bg-white shadow-sm position-sticky" style={{ top: 0 }}>
-                        <div className="d-flex align-items-center gap-2 mb-4">
-                          <div className="bg-emerald bg-opacity-10 p-2 rounded-3 text-emerald">
-                            <i className="bi bi-plus-circle-fill fs-5"></i>
-                          </div>
-                          <h6 className="fw-bold text-dark mb-0">Record New Payment</h6>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Tenant Entity Type</label>
+                          <select className="form-select shadow-none" disabled={isView}
+                            value={formData.tenantType} onChange={(e) => setFormData({...formData, tenantType: e.target.value})} style={{ borderRadius: '6px' }}>
+                            <option value="Individual">Individual</option>
+                            <option value="Company">Company</option>
+                            <option value="Corporate">Corporate</option>
+                          </select>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Primary Mobile Number *</label>
+                          <input type="text" className={`form-control shadow-none ${errors.tenantContact ? 'is-invalid' : ''}`} required disabled={isView}
+                            value={formData.tenantContact} onChange={(e) => setFormData({...formData, tenantContact: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.tenantContact && <div className="invalid-feedback">{errors.tenantContact}</div>}
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Official Email Address *</label>
+                          <input type="email" className={`form-control shadow-none ${errors.tenantEmail ? 'is-invalid' : ''}`} required disabled={isView}
+                            value={formData.tenantEmail} onChange={(e) => setFormData({...formData, tenantEmail: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.tenantEmail && <div className="invalid-feedback">{errors.tenantEmail}</div>}
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Alternate Contact / Phone</label>
+                          <input type="text" className="form-control shadow-none" disabled={isView}
+                            value={formData.alternateContact} onChange={(e) => setFormData({...formData, alternateContact: e.target.value})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">GSTIN / PAN Code</label>
+                          <input type="text" className={`form-control shadow-none ${errors.gstPan ? 'is-invalid' : ''}`} disabled={isView}
+                            value={formData.gstPan} onChange={(e) => setFormData({...formData, gstPan: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.gstPan && <div className="invalid-feedback">{errors.gstPan}</div>}
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Emergency Contact Info</label>
+                          <input type="text" className="form-control shadow-none" placeholder="Name & Mobile Relation" disabled={isView}
+                            value={formData.emergencyContact} onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-12">
+                          <label className="form-label small fw-bold text-muted mb-1">Permanent Legal Address *</label>
+                          <input type="text" className={`form-control shadow-none ${errors.address ? 'is-invalid' : ''}`} required disabled={isView}
+                            value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.address && <div className="invalid-feedback">{errors.address}</div>}
                         </div>
 
-                        <form onSubmit={handleRecordPayment}>
-                          <div className="row g-3">
-                            <div className="col-12">
-                              <label className="form-label small fw-bold text-muted mb-1">Payment Month & Year</label>
-                              <div className="d-flex gap-2">
-                                <select className="form-select form-select-sm bg-light border-0 py-2 rounded-3" value={newPayment.month} onChange={(e) => setNewPayment({...newPayment, month: e.target.value})}>
-                                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m}</option>)}
-                                </select>
-                                <input type="number" className="form-select form-select-sm bg-light border-0 py-2 rounded-3 w-auto" style={{ width: '100px' }} value={newPayment.year} onChange={(e) => setNewPayment({...newPayment, year: Number(e.target.value)})} />
+                        {/* ID Upload Previews */}
+                        {!isView && (
+                          <>
+                            <div className="col-md-6">
+                              <label className="form-label small fw-bold text-muted mb-1">Profile Photo Upload</label>
+                              <div className="border rounded-3 p-2 bg-light text-center cursor-pointer" style={{ borderStyle: 'dashed' }}>
+                                <input type="file" className="d-none" id="profile-photo" onChange={(e) => setProfilePhoto(e.target.files ? e.target.files[0] : null)} />
+                                <label htmlFor="profile-photo" className="w-100 m-0" style={{ cursor: 'pointer' }}>
+                                  <i className="bi bi-person-bounding-box text-primary me-2"></i>
+                                  <span className="small fw-semibold">{profilePhoto ? profilePhoto.name : 'Choose Profile Image'}</span>
+                                </label>
                               </div>
                             </div>
-
-                            <div className="col-12">
-                              <label className="form-label small fw-bold text-muted mb-1">Amount Received (₹)</label>
-                              <div className="input-group">
-                                <span className="input-group-text bg-light border-0 text-muted">₹</span>
-                                <input type="number" className="form-control form-control-sm bg-light border-0 py-2 rounded-3" required 
-                                  value={newPayment.amount} onChange={(e) => setNewPayment({...newPayment, amount: Number(e.target.value)})} 
-                                  placeholder="0.00" />
+                            <div className="col-md-6">
+                              <label className="form-label small fw-bold text-muted mb-1">ID Proof Upload</label>
+                              <div className="border rounded-3 p-2 bg-light text-center cursor-pointer" style={{ borderStyle: 'dashed' }}>
+                                <input type="file" className="d-none" id="id-proof" onChange={(e) => setIdProof(e.target.files ? e.target.files[0] : null)} />
+                                <label htmlFor="id-proof" className="w-100 m-0" style={{ cursor: 'pointer' }}>
+                                  <i className="bi bi-file-earmark-pdf text-primary me-2"></i>
+                                  <span className="small fw-semibold">{idProof ? idProof.name : 'Choose ID Document'}</span>
+                                </label>
                               </div>
                             </div>
-
-                            <div className="col-12">
-                              <label className="form-label small fw-bold text-muted mb-1">Payment Channel</label>
-                              <select className="form-select form-select-sm bg-light border-0 py-2 rounded-3" value={newPayment.paymentMethod} onChange={(e) => setNewPayment({...newPayment, paymentMethod: e.target.value})}>
-                                <option value="Online">Online Transfer (IMPS/UPI)</option>
-                                <option value="Cheque">Physical Cheque</option>
-                                <option value="Cash">Direct Cash</option>
-                                <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
-                              </select>
-                            </div>
-
-                            <div className="col-12">
-                              <label className="form-label small fw-bold text-muted mb-1">Payment Status</label>
-                              <select className="form-select form-select-sm bg-light border-0 py-2 rounded-3" value={newPayment.status} onChange={(e) => setNewPayment({...newPayment, status: e.target.value})}>
-                                <option value="Paid">Fully Paid (Settled)</option>
-                                <option value="Partial">Partial Payment</option>
-                                <option value="Pending">Pending / Disputed</option>
-                              </select>
-                            </div>
-
-                            <div className="col-12 pt-2">
-                              <button 
-                                type="submit" 
-                                className="btn w-100 rounded-pill fw-bold py-2 shadow-sm border-0 transition-all" 
-                                disabled={isRecordingPayment}
-                                style={{ 
-                                  backgroundColor: '#10B981', 
-                                  color: 'white',
-                                  fontSize: '0.85rem'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10B981'}
-                              >
-                                {isRecordingPayment ? (
-                                  <><span className="spinner-border spinner-border-sm me-2" role="status"></span>Saving Record...</>
-                                ) : (
-                                  <><i className="bi bi-check2-circle me-2"></i>Confirm & Save Payment</>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </form>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Payments List */}
-                  <div className={isView ? "col-12" : "col-md-7"}>
-                    <div className="p-4 border rounded-4 bg-white shadow-sm h-100 min-vh-50">
-                      <div className="d-flex justify-content-between align-items-center mb-4">
-                        <h6 className="fw-bold text-dark mb-0">
-                          <i className="bi bi-clock-history text-emerald me-2"></i>Recent Ledger Entries
-                        </h6>
-                        <span className="badge bg-light text-muted border px-3 py-2 rounded-pill small fw-normal">
-                          {payments.length} Records Found
-                        </span>
+                  {/* Step 2: Property & space allocation */}
+                  {activeStep === 2 && (
+                    <div className="step-content">
+                      <div className="p-3 bg-light rounded-3 mb-4 border-start border-4 border-primary">
+                        <h6 className="fw-bold mb-1 text-dark">Space Mappings & SFT Allocation</h6>
+                        <p className="text-muted small mb-0">Select target Property first, then Floor, and link vacant offices. Over-allocation of SFT is automatically blocked.</p>
                       </div>
-                      
-                      {payments.length > 0 ? (
-                        <div className="table-responsive">
-                          <table className="table table-hover align-middle border-top-0">
-                            <thead>
-                              <tr className="text-muted small">
-                                <th className="border-0 pb-3 fw-bold">BILLING PERIOD</th>
-                                <th className="border-0 pb-3 fw-bold">AMOUNT</th>
-                                <th className="border-0 pb-3 fw-bold text-end">STATUS</th>
-                              </tr>
-                            </thead>
-                            <tbody className="border-top-0">
-                              {payments.map((p: any) => (
-                                <tr key={p._id} className="border-bottom border-light">
-                                  <td className="py-3">
-                                    <div className="fw-bold text-dark">{p.month} {p.year}</div>
-                                    <div className="text-muted small" style={{ fontSize: '0.65rem' }}>Recorded on {new Date(p.paymentDate).toLocaleDateString()}</div>
-                                  </td>
-                                  <td className="py-3">
-                                    <div className="fw-bold text-dark">₹{p.amount.toLocaleString()}</div>
-                                    <div className="text-muted" style={{ fontSize: '0.65rem' }}>via {p.paymentMethod}</div>
-                                  </td>
-                                  <td className="py-3 text-end">
-                                    <span className={`badge rounded-pill px-3 py-1 ${p.status === 'Paid' ? 'bg-success bg-opacity-10 text-success' : 'bg-warning bg-opacity-10 text-warning'}`} style={{ fontSize: '0.65rem' }}>
-                                      {p.status}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+
+                      <div className="row g-3 mb-4">
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Select Property *</label>
+                          <select className="form-select shadow-none" required disabled={isView}
+                            value={formData.property} onChange={(e) => setFormData({...formData, property: e.target.value, floor: "", units: []})}>
+                            <option value="">Choose Property...</option>
+                            {allProperties.map(p => <option key={p._id} value={p._id}>{p.propertyName}</option>)}
+                          </select>
                         </div>
-                      ) : (
-                        <div className="text-center py-5">
-                          <div className="bg-light d-inline-flex p-4 rounded-circle mb-3">
-                            <i className="bi bi-journal-x fs-1 text-muted opacity-50"></i>
+
+                        {formData.property && (
+                          <div className="col-md-6">
+                            <label className="form-label small fw-bold text-muted mb-1">Select Floor *</label>
+                            <select className="form-select shadow-none" required disabled={isView}
+                              value={formData.floor} onChange={(e) => setFormData({...formData, floor: e.target.value})}>
+                              <option value="">Choose Floor...</option>
+                              {propertyStructure?.floors?.map((f: any) => (
+                                <option key={f.floorId} value={f.floorId}>{f.floorName}</option>
+                              ))}
+                            </select>
                           </div>
-                          <h6 className="fw-bold text-muted">No Ledger Entries</h6>
-                          <p className="text-muted small mb-0 px-5">Start recording monthly rent payments to build your financial history for this lease.</p>
+                        )}
+
+                        {formData.property && formData.floor && (
+                          <div className="col-md-6">
+                            <label className="form-label small fw-bold text-muted mb-1">Select Vacant Office / Unit *</label>
+                            <select className="form-select shadow-none" disabled={isView}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val) {
+                                  toggleUnit(val);
+                                  e.target.value = ""; // reset select
+                                }
+                              }}>
+                              <option value="">Choose Vacant Unit...</option>
+                              {availableUnitsOnFloor.map((u: any) => (
+                                <option key={u.unitId} value={u.unitId}>
+                                  Unit {u.unitName} ({u.sft || 0} SFT)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Office Space Status</label>
+                          <select className="form-select shadow-none" disabled={isView}
+                            value={formData.officeStatus} onChange={(e) => setFormData({...formData, officeStatus: e.target.value})}>
+                            <option value="Vacant">Vacant (Available)</option>
+                            <option value="Occupied">Occupied</option>
+                            <option value="Reserved">Reserved</option>
+                            <option value="Under Maintenance">Under Maintenance</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Display Selected Linked Units */}
+                      {formData.units.length > 0 && (
+                        <div className="mb-4">
+                          <label className="form-label small fw-bold text-dark d-block">Active Leased Spaces:</label>
+                          <div className="d-flex flex-column gap-2">
+                            {formData.units.map(unitId => {
+                              const unit = allUnits.find(u => u._id === unitId);
+                              return (
+                                <div key={unitId} className="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-white shadow-sm">
+                                  <div>
+                                    <span className="fw-bold text-dark">Unit {unit?.unitNumber || "Office"}</span>
+                                    <span className="text-muted small mx-2">|</span>
+                                    <span className="text-muted small fw-medium">{unit?.sqft || 0} SFT</span>
+                                  </div>
+                                  {!isView && (
+                                    <button type="button" className="btn btn-sm btn-outline-danger px-3 py-1 rounded-pill" onClick={() => toggleUnit(unitId)}>
+                                      Unlink Space
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Property Hierarchy & Calculations */}
+                      {formData.floor && (
+                        <div className="grouped-units-container border rounded-3 p-3 bg-white shadow-sm mb-3">
+                          <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                            <span className="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
+                              <i className="bi bi-layers-fill text-primary"></i> Floor capacity allocation breakdown
+                            </span>
+                          </div>
+
+                          <div className="row g-3 text-center">
+                            <div className="col-4 border-end">
+                              <label className="text-muted small d-block mb-1">Total Available SFT</label>
+                              <div className="fw-bold text-dark fs-5">{totalFloorSft.toLocaleString()} SFT</div>
+                            </div>
+                            <div className="col-4 border-end">
+                              <label className="text-muted small d-block mb-1">Assigned SFT</label>
+                              <div className={`fw-bold fs-5 ${formData.assignedSft > totalFloorSft ? 'text-danger' : 'text-dark'}`}>
+                                {formData.assignedSft.toLocaleString()} SFT
+                              </div>
+                            </div>
+                            <div className="col-4">
+                              <label className="text-muted small d-block mb-1">Remaining SFT</label>
+                              <div className="fw-bold text-dark fs-5">{remainingFloorSft.toLocaleString()} SFT</div>
+                            </div>
+                          </div>
+
+                          {/* SFT Over-allocation Warnings */}
+                          {errors.units && (
+                            <div className="alert alert-danger d-flex align-items-center gap-2 p-2 rounded-3 mt-3 mb-0" style={{ fontSize: '0.8rem' }}>
+                              <i className="bi bi-exclamation-triangle-fill"></i>
+                              <span>{errors.units}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {/* Step 3: Financial & Payments settings */}
+                  {activeStep === 3 && (
+                    <div className="step-content animate-fadeIn">
+                      <div className="p-3 bg-light rounded-3 mb-4 border-start border-4 border-primary">
+                        <h6 className="fw-bold mb-1 text-dark">Financial Terms & Agreement Duration</h6>
+                        <p className="text-muted small mb-0">Fill in base SFT prices and recurring bills. Escalations and security deposits are automatically calculated.</p>
+                      </div>
+
+                      <h6 className="fw-bold text-primary mb-3">
+                        <i className="bi bi-calendar-range me-2"></i>Agreement Duration & Lock-in
+                      </h6>
+                      <div className="row g-3 mb-4">
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Lease Start Date *</label>
+                          <input type="date" className={`form-control shadow-none ${errors.startDate ? 'is-invalid' : ''}`} required disabled={isView}
+                            value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.startDate && <div className="invalid-feedback">{errors.startDate}</div>}
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Lease End Date *</label>
+                          <input type="date" className={`form-control shadow-none ${errors.endDate ? 'is-invalid' : ''}`} required disabled={isView}
+                            value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} style={{ borderRadius: '6px' }} />
+                          {errors.endDate && <div className="invalid-feedback">{errors.endDate}</div>}
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Lock-in Period (Months)</label>
+                          <input type="number" className="form-control shadow-none" disabled={isView}
+                            value={formData.lockInPeriod} onChange={(e) => setFormData({...formData, lockInPeriod: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Notice Period (Months)</label>
+                          <input type="number" className="form-control shadow-none" disabled={isView}
+                            value={formData.noticePeriod} onChange={(e) => setFormData({...formData, noticePeriod: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                      </div>
+
+                      <h6 className="fw-bold text-primary mb-3">
+                        <i className="bi bi-cash-coin me-2"></i>Financial & CAM Computations
+                      </h6>
+                      <div className="row g-3 mb-4">
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Rent / SFT (₹)</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 50" disabled={isView}
+                            value={formData.rentPerSft || ""} onChange={(e) => setFormData({...formData, rentPerSft: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">CAM / SFT (₹)</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 8" disabled={isView}
+                            value={formData.camPerSft || ""} onChange={(e) => setFormData({...formData, camPerSft: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Deposit Months</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 3" disabled={isView}
+                            value={formData.depositMonths || ""} onChange={(e) => setFormData({...formData, depositMonths: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Utility / Fixed Charges</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 2500" disabled={isView}
+                            value={formData.utilityCharges || ""} onChange={(e) => setFormData({...formData, utilityCharges: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Parking / Surcharge</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 1000" disabled={isView}
+                            value={formData.parkingCharges || ""} onChange={(e) => setFormData({...formData, parkingCharges: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Escalation Percentage (%)</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 5" disabled={isView}
+                            value={formData.escalationPercentage || ""} onChange={(e) => setFormData({...formData, escalationPercentage: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Tax Percentage (%)</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 18" disabled={isView}
+                            value={formData.taxPercentage || ""} onChange={(e) => setFormData({...formData, taxPercentage: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Discount Amount (₹)</label>
+                          <input type="number" className="form-control shadow-none" placeholder="e.g. 500" disabled={isView}
+                            value={formData.discountAmount || ""} onChange={(e) => setFormData({...formData, discountAmount: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold text-muted mb-1">Rent Due Day *</label>
+                          <input type="number" className="form-control shadow-none" placeholder="5" required min="1" max="28" disabled={isView}
+                            value={formData.dueDay} onChange={(e) => setFormData({...formData, dueDay: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                      </div>
+
+                      {/* Section 3.3: Ledger & Payment Tracking */}
+                      <h6 className="fw-bold text-primary mb-3">
+                        <i className="bi bi-shield-check me-2"></i>Ledger & Payment Tracking System
+                      </h6>
+                      <div className="row g-3">
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Paid Amount (₹)</label>
+                          <input type="number" className="form-control shadow-none" disabled={isView}
+                            value={formData.paidAmount} onChange={(e) => setFormData({...formData, paidAmount: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Pending Amount (₹)</label>
+                          <input type="number" className="form-control shadow-none" disabled={isView}
+                            value={formData.pendingAmount} onChange={(e) => setFormData({...formData, pendingAmount: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Overdue Amount (₹)</label>
+                          <input type="number" className="form-control shadow-none" disabled={isView}
+                            value={formData.overdueAmount} onChange={(e) => setFormData({...formData, overdueAmount: Number(e.target.value)})} style={{ borderRadius: '6px' }} />
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label small fw-bold text-muted mb-1">Payment Status</label>
+                          <select className="form-select shadow-none" disabled={isView}
+                            value={formData.paymentStatus} onChange={(e) => setFormData({...formData, paymentStatus: e.target.value})} style={{ borderRadius: '6px' }}>
+                            <option value="Paid">Paid</option>
+                            <option value="Partial">Partial</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Overdue">Overdue</option>
+                          </select>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Next Payment Due Date</label>
+                          <input type="date" className="form-control shadow-none" disabled={isView}
+                            value={formData.nextDueDate} onChange={(e) => setFormData({...formData, nextDueDate: e.target.value})} style={{ borderRadius: '6px' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 4: Documents and Remarks */}
+                  {activeStep === 4 && (
+                    <div className="step-content animate-fadeIn">
+                      <div className="p-3 bg-light rounded-3 mb-4 border-start border-4 border-primary">
+                        <h6 className="fw-bold mb-1 text-dark">Agreement Review & Execution</h6>
+                        <p className="text-muted small mb-0">Upload scanned agreement documents, select reminders, and register remarks to execute the lease agreement.</p>
+                      </div>
+
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Agreement Status</label>
+                          <select className="form-select shadow-none" disabled={isView}
+                            value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ borderRadius: '6px' }}>
+                            <option value="Draft">Draft</option>
+                            <option value="Active">Active</option>
+                            <option value="Expired">Expired</option>
+                            <option value="Terminated">Terminated</option>
+                            <option value="Renewal Pending">Renewal Pending</option>
+                          </select>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label small fw-bold text-muted mb-1">Renewal Reminder Days Before</label>
+                          <select className="form-select shadow-none" disabled={isView}
+                            value={formData.renewalReminderDays} onChange={(e) => setFormData({...formData, renewalReminderDays: Number(e.target.value)})} style={{ borderRadius: '6px' }}>
+                            <option value="7">7 Days</option>
+                            <option value="15">15 Days</option>
+                            <option value="30">30 Days</option>
+                            <option value="60">60 Days</option>
+                          </select>
+                        </div>
+
+                        {!isView && (
+                          <div className="col-md-12">
+                            <label className="form-label small fw-bold text-muted mb-1">Upload Agreement Attachment</label>
+                            <div className="border rounded-3 p-3 bg-light text-center cursor-pointer" style={{ borderStyle: 'dashed' }}>
+                              <input type="file" className="d-none" id="agreement-file" onChange={(e) => setAgreementFile(e.target.files ? e.target.files[0] : null)} />
+                              <label htmlFor="agreement-file" className="w-100 m-0" style={{ cursor: 'pointer' }}>
+                                <i className="bi bi-cloud-arrow-up-fill text-primary fs-4 d-block mb-1"></i>
+                                <span className="small fw-bold text-dark">{agreementFile ? agreementFile.name : 'Drag & Drop Agreement PDF'}</span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="col-12">
+                          <div className="form-check form-switch mb-3">
+                            <input className="form-check-input" type="checkbox" role="switch" id="auto-renewal" disabled={isView}
+                              checked={formData.autoRenewal} onChange={(e) => setFormData({...formData, autoRenewal: e.target.checked})} />
+                            <label className="form-check-label small fw-bold text-secondary ms-2" htmlFor="auto-renewal">Enable Auto Renewal upon End Date</label>
+                          </div>
+                        </div>
+
+                        <div className="col-12">
+                          <label className="form-label small fw-bold text-muted mb-1">Internal Notes & Special Clauses</label>
+                          <textarea className="form-control shadow-none" rows={3} disabled={isView}
+                            value={formData.remarks} onChange={(e) => setFormData({...formData, remarks: e.target.value})} style={{ borderRadius: '6px' }} placeholder="Enter remarks..."></textarea>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </form>
+              </div>
+
+              {/* Sticky Summary Preview Sidebar */}
+              <div className="col-lg-4 p-4 bg-light border-start h-100 overflow-auto">
+                <div className="d-flex flex-column gap-3">
+                  
+                  {/* Glassmorphism Title Panel */}
+                  <div className="p-3 rounded-3 text-white" style={{ background: 'linear-gradient(135deg, #014aad 0%, #1e40af 100%)' }}>
+                    <div className="d-flex align-items-center gap-2">
+                      <i className="bi bi-file-earmark-text fs-5"></i>
+                      <h6 className="fw-bold mb-0">Lease Summary</h6>
+                    </div>
+                    <span className="small opacity-75">Live calculation preview panel</span>
+                  </div>
+
+                  <div className="d-flex flex-column gap-3 p-1">
+                    
+                    {/* Basic specs */}
+                    <div>
+                      <span className="text-muted small fw-bold text-uppercase d-block mb-1">Primary Lease Holder</span>
+                      <div className="fw-bold text-dark">{formData.tenantName || "Rajesh Kumar (New)"}</div>
+                      {formData.companyName && <span className="small text-muted">{formData.companyName}</span>}
+                    </div>
+
+                    <hr className="my-1 text-muted opacity-25" />
+
+                    {/* SFT calculations */}
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span className="text-muted small fw-bold text-uppercase d-block">Allocated Space</span>
+                        <span className="small text-muted">{formData.units.length} Units selected</span>
+                      </div>
+                      <div className="text-end">
+                        <span className="fs-5 fw-bold text-dark">{formData.assignedSft}</span>
+                        <span className="text-muted small d-block">SFT</span>
+                      </div>
+                    </div>
+
+                    <hr className="my-1 text-muted opacity-25" />
+
+                    {/* Rent & Deposit */}
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span className="text-muted small fw-bold text-uppercase d-block">Monthly Base Rent</span>
+                        <span className="small text-muted">₹{formData.rentPerSft}/SFT rate</span>
+                      </div>
+                      <div className="text-end">
+                        <span className="fs-6 fw-bold text-dark">₹{formData.monthlyRent.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span className="text-muted small fw-bold text-uppercase d-block">CAM Maintenance Fee</span>
+                        <span className="small text-muted">₹{formData.camPerSft}/SFT rate</span>
+                      </div>
+                      <div className="text-end">
+                        <span className="fs-6 fw-bold text-dark">₹{formData.maintenanceCharges.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <span className="text-muted small fw-bold text-uppercase d-block">Security Deposit</span>
+                        <span className="small text-muted">{formData.depositMonths} months hold</span>
+                      </div>
+                      <div className="text-end">
+                        <span className="fs-6 fw-semibold text-dark">₹{formData.securityDeposit.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Highlighted Monthly obligation amount */}
+                    <div className="p-3 border rounded-3 bg-white" style={{ borderLeft: `4px solid ${getStatusColor(formData.status)}` }}>
+                      <span className="text-muted small fw-bold text-uppercase d-block mb-1">Total Recurring Monthly (incl. tax)</span>
+                      <div className="fs-4 fw-bold text-primary">₹{formData.totalMonthlyAmount.toLocaleString()}</div>
+                      <span className="small text-muted d-block mt-1">
+                        <i className="bi bi-calendar-check me-1"></i> Due on {formData.dueDay}th of each month.
+                      </span>
+                    </div>
+
+                    {/* Status badge representation */}
+                    <div className="d-flex align-items-center justify-content-between p-2 border rounded-3 bg-white">
+                      <span className="small fw-semibold text-muted">Agreement Status</span>
+                      <span className="badge text-white rounded-pill px-3 py-1 fw-bold" style={{ backgroundColor: getStatusColor(formData.status), fontSize: '0.75rem' }}>
+                        {formData.status}
+                      </span>
+                    </div>
+
+                    {/* Timeline summary */}
+                    {formData.startDate && formData.endDate && (
+                      <div className="p-2 border rounded-3 bg-white small text-muted">
+                        <div className="mb-1"><i className="bi bi-calendar-event me-2 text-primary"></i>Start: <strong>{new Date(formData.startDate).toLocaleDateString()}</strong></div>
+                        <div><i className="bi bi-calendar-x me-2 text-danger"></i>End: <strong>{new Date(formData.endDate).toLocaleDateString()}</strong></div>
+                      </div>
+                    )}
+
                   </div>
                 </div>
               </div>
-            )}
+
+            </div>
           </div>
-          
-          <div className="modal-footer border-top p-4 d-flex gap-3 bg-light">
-            <button 
-              type="button" className="btn btn-outline-secondary rounded-pill px-4 fw-bold" 
-              onClick={onClose} disabled={isSubmitting} style={{ fontSize: '0.85rem' }}
-            >
-              {isView ? 'Close' : 'Cancel'}
-            </button>
-            {activeTab === 'agreement' && !isView && (
-              <button 
-                type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm text-white border-0"
-                disabled={isSubmitting}
-                onClick={(e) => { e.preventDefault(); handleSubmit(e); }}
-                style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
-              >
-                {isSubmitting ? (
-                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                ) : null}
-                {editData ? 'Update Lease' : 'Confirm Lease Agreement'}
+
+          {/* Footer Controls */}
+          <div className="modal-footer border-top p-3 d-flex justify-content-between bg-light flex-shrink-0">
+            <div>
+              {activeStep > 1 && (
+                <button type="button" className="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm" onClick={handlePrev}>
+                  <i className="bi bi-chevron-left"></i> Previous Step
+                </button>
+              )}
+            </div>
+            <div className="d-flex gap-2">
+              <button type="button" className="btn btn-light border rounded-pill px-4 fw-bold" onClick={onClose}>
+                Cancel
               </button>
-            )}
+              {activeStep < 4 ? (
+                <button type="button" className="btn btn-primary rounded-pill px-4 fw-bold text-white shadow-sm" style={{ backgroundColor: '#014aad' }} onClick={handleNext}>
+                  Next Step <i className="bi bi-chevron-right"></i>
+                </button>
+              ) : (
+                !isView && (
+                  <button type="submit" className="btn btn-primary rounded-pill px-4 fw-bold text-white shadow-sm" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }} onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                    ) : null}
+                    {editData ? 'Update Lease' : 'Register Agreement'}
+                  </button>
+                )
+              )}
+            </div>
           </div>
+
         </div>
       </div>
     </div>

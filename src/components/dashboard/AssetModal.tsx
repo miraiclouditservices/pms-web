@@ -31,7 +31,9 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
     purchaseValue: "",
     warrantyStartDate: "",
     warrantyEndDate: "",
-    vendorDetails: "",
+    amcStartDate: "",
+    amcEndDate: "",
+    vendorName: "",
     contactName: "",
     contactNumber: ""
   });
@@ -52,6 +54,9 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
           purchaseDate: formatDate(editData.purchaseDate),
           warrantyStartDate: formatDate(editData.warrantyStartDate),
           warrantyEndDate: formatDate(editData.warrantyEndDate),
+          amcStartDate: formatDate(editData.amcStartDate),
+          amcEndDate: formatDate(editData.amcEndDate),
+          vendorName: editData.vendorName || "",
           property: typeof editData.property === 'object' ? editData.property?._id : editData.property,
           unit: typeof editData.unit === 'object' ? editData.unit?._id : editData.unit,
         });
@@ -72,9 +77,12 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
           purchaseValue: "",
           warrantyStartDate: "",
           warrantyEndDate: "",
-          vendorDetails: "",
+          amcStartDate: "",
+          amcEndDate: "",
+          vendorName: "",
           contactName: "",
-          contactNumber: ""
+          contactNumber: "",
+          createdBy: null
         });
       }
     }
@@ -118,10 +126,10 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
       alignItems: 'center', justifyContent: 'center', zIndex: 9999,
       backdropFilter: 'blur(10px)', animation: 'fadeIn 0.3s ease-out'
     }}>
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{__html: `
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-      `}</style>
+      `}} />
       
       <div className="modal-dialog modal-lg w-100 mx-3" style={{ maxWidth: '850px', animation: 'slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
         <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden bg-white">
@@ -140,12 +148,12 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                    <div className="row g-4">
                      <div className="col-12">
                         <div className="p-3 rounded-4 border bg-emerald bg-opacity-5 d-flex align-items-center gap-3 mb-2 border-emerald border-opacity-10">
-                           <div className="bg-emerald bg-opacity-10 text-emerald p-3 rounded-circle">
+                           <div className="bg-emerald bg-opacity-10 text-primary p-3 rounded-circle">
                               <i className={`bi ${formData.category === 'HVAC' ? 'bi-wind' : formData.category === 'Electrical' ? 'bi-lightning-charge' : 'bi-box-seam'} fs-4`}></i>
                            </div>
                            <div>
                               <h4 className="fw-bold mb-0" style={{ color: '#0F172A' }}>{formData.assetDescription}</h4>
-                              <span className="badge bg-emerald bg-opacity-10 text-emerald rounded-pill px-3">{formData.category}</span>
+                              <span className="badge bg-emerald bg-opacity-10 text-primary rounded-pill px-3">{formData.category}</span>
                            </div>
                         </div>
                      </div>
@@ -153,7 +161,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                      <div className="col-md-6">
                         <div className="p-3 rounded-4 border h-100 bg-white shadow-sm">
                            <h6 className="fw-bold text-muted small text-uppercase mb-3 d-flex align-items-center gap-2">
-                             <i className="bi bi-geo-alt text-emerald"></i> Location Analytics
+                             <i className="bi bi-geo-alt text-primary"></i> Location Analytics
                            </h6>
                            <div className="d-flex flex-column gap-3">
                               <div className="d-flex justify-content-between border-bottom pb-2">
@@ -170,7 +178,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                               </div>
                               <div className="d-flex justify-content-between border-bottom pb-2">
                                  <span className="text-muted small">Specific Spot</span>
-                                 <span className="fw-bold small text-emerald">{formData.assetLocation}</span>
+                                 <span className="fw-bold small text-primary">{formData.assetLocation}</span>
                               </div>
                               <div className="d-flex justify-content-between">
                                  <span className="text-muted small">Asset Tag</span>
@@ -183,7 +191,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                      <div className="col-md-6">
                         <div className="p-3 rounded-4 border h-100 bg-white shadow-sm">
                            <h6 className="fw-bold text-muted small text-uppercase mb-3 d-flex align-items-center gap-2">
-                             <i className="bi bi-info-circle text-emerald"></i> Specifications
+                             <i className="bi bi-info-circle text-primary"></i> Specifications
                            </h6>
                            <div className="d-flex flex-column gap-3">
                               <div className="d-flex justify-content-between border-bottom pb-2">
@@ -202,9 +210,16 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                                  <span className="text-muted small">Purchase Date</span>
                                  <span className="fw-bold small">{formData.purchaseDate ? new Date(formData.purchaseDate).toLocaleDateString() : 'N/A'}</span>
                               </div>
-                              <div className="d-flex justify-content-between">
+                              <div className="d-flex justify-content-between border-bottom pb-2">
                                  <span className="text-muted small">Asset Status</span>
                                  <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3">Operational</span>
+                              </div>
+                              <div className="d-flex justify-content-between">
+                                 <span className="text-muted small">Registered By</span>
+                                 <span className="fw-bold small text-primary d-flex align-items-center gap-1">
+                                    <i className="bi bi-person-check-fill"></i>
+                                    {formData.createdBy ? (typeof formData.createdBy === 'object' ? formData.createdBy.name : 'System Admin') : 'System Admin'}
+                                 </span>
                               </div>
                            </div>
                         </div>
@@ -229,15 +244,15 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                     </div>
                   )}
 
-                  <h6 className="fw-bold text-emerald mb-3 d-flex align-items-center gap-2" style={{ color: '#10B981' }}>
+                  <h6 className="fw-bold text-primary mb-3 d-flex align-items-center gap-2" style={{ color: '#014aad' }}>
                     <i className="bi bi-info-square-fill"></i> Core Asset Identity
                   </h6>
                   <div className="row g-3 mb-4">
                     <div className="col-md-4">
                       <label className="form-label small fw-bold text-muted mb-1">Asset Code (Auto-Generated)</label>
                       <div className="input-group">
-                        <span className="input-group-text bg-emerald bg-opacity-10 border-0 text-emerald"><i className="bi bi-hash"></i></span>
-                        <input type="text" className="form-control form-control-sm bg-white border-0 fw-bold text-emerald shadow-none" readOnly
+                        <span className="input-group-text bg-emerald bg-opacity-10 border-0 text-primary"><i className="bi bi-hash"></i></span>
+                        <input type="text" className="form-control form-control-sm bg-white border-0 fw-bold text-primary shadow-none" readOnly
                           value={formData.assetCode} />
                       </div>
                     </div>
@@ -358,7 +373,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                   <hr className="text-muted opacity-25" />
 
                   {/* Warranty Details */}
-                  <h6 className="fw-bold text-emerald mb-3 d-flex align-items-center gap-2" style={{ color: '#10B981' }}>
+                  <h6 className="fw-bold text-primary mb-3 d-flex align-items-center gap-2" style={{ color: '#014aad' }}>
                     <i className="bi bi-shield-check"></i> Warranty & Lifecycle Support
                   </h6>
                   <div className="row g-3">
@@ -372,11 +387,30 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                       <input type="date" className="form-control form-control-sm bg-light border-0 py-2"
                         value={formData.warrantyEndDate} onChange={(e) => setFormData({...formData, warrantyEndDate: e.target.value})} />
                     </div>
+                  </div>
+
+                  <hr className="text-muted opacity-25 mt-4 mb-4" />
+
+                  {/* AMC Details */}
+                  <h6 className="fw-bold text-primary mb-3 d-flex align-items-center gap-2" style={{ color: '#014aad' }}>
+                    <i className="bi bi-calendar-check-fill"></i> AMC (Annual Maintenance Contract)
+                  </h6>
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label small fw-bold text-muted mb-1">AMC Start Date</label>
+                      <input type="date" className="form-control form-control-sm bg-light border-0 py-2"
+                        value={formData.amcStartDate} onChange={(e) => setFormData({...formData, amcStartDate: e.target.value})} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small fw-bold text-muted mb-1">AMC Expiry Date</label>
+                      <input type="date" className="form-control form-control-sm bg-light border-0 py-2"
+                        value={formData.amcEndDate} onChange={(e) => setFormData({...formData, amcEndDate: e.target.value})} />
+                    </div>
                     <div className="col-md-12">
-                      <label className="form-label small fw-bold text-muted mb-1">Authorized Support Vendor</label>
+                      <label className="form-label small fw-bold text-muted mb-1">AMC Provider / Vendor Name</label>
                       <input type="text" className="form-control form-control-sm bg-light border-0 py-2"
-                        placeholder="Vendor name and contact details"
-                        value={formData.vendorDetails} onChange={(e) => setFormData({...formData, vendorDetails: e.target.value})} />
+                        placeholder="e.g. Blue Star Services"
+                        value={formData.vendorName} onChange={(e) => setFormData({...formData, vendorName: e.target.value})} />
                     </div>
                   </div>
                 </div>
@@ -395,7 +429,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                 <button 
                   type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

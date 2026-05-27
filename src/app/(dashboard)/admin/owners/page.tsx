@@ -128,7 +128,7 @@ function OwnersContent() {
         <div className="bg-white p-4 rounded-xl shadow-sm border mb-4">
           <div className="d-flex justify-content-between align-items-start">
             <div className="d-flex gap-4">
-              <div className="bg-emerald bg-opacity-10 text-emerald rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '80px', height: '80px', fontSize: '2rem' }}>
+              <div className="bg-emerald bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '80px', height: '80px', fontSize: '2rem' }}>
                 <i className={owner.ownerType === 'Company' ? "bi bi-building" : "bi bi-person-fill"}></i>
               </div>
               <div>
@@ -153,7 +153,7 @@ function OwnersContent() {
             {['units', 'leases', 'materials', 'visitors'].map((tab) => (
               <button 
                 key={tab}
-                className={`pb-3 fw-bold border-bottom border-2 transition-all text-capitalize ${activeTab === tab ? 'border-emerald text-emerald' : 'border-transparent text-muted'}`}
+                className={`pb-3 fw-bold border-bottom border-2 transition-all text-capitalize ${activeTab === tab ? 'border-emerald text-primary' : 'border-transparent text-muted'}`}
                 onClick={() => setActiveTab(tab as any)}
                 style={{ fontSize: '0.85rem', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}
               >
@@ -221,7 +221,7 @@ function OwnersContent() {
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>{l.units?.length} Unit(s)</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="fw-bold text-emerald small">₹{l.monthlyRent.toLocaleString()}</div>
+                          <div className="fw-bold text-primary small">₹{l.monthlyRent.toLocaleString()}</div>
                           <div className="text-muted small" style={{ fontSize: '0.65rem' }}>
                             Exp: {new Date(l.endDate).toLocaleDateString()}
                           </div>
@@ -254,7 +254,7 @@ function OwnersContent() {
                       <tr><td colSpan={4} className="text-center py-5 text-muted">No gate passes found.</td></tr>
                     ) : materials.map((m: any) => (
                       <tr key={m._id}>
-                        <td className="px-4 py-3 fw-bold text-emerald small">{m._id.toString().toUpperCase()}</td>
+                        <td className="px-4 py-3 fw-bold text-primary small">{m._id.toString().toUpperCase()}</td>
                         <td className="px-4 py-3">
                           <div className="fw-medium text-dark">{m.materialDetails}</div>
                           <div className="text-muted small">Qty: {m.quantity} | {new Date(m.createdAt).toLocaleDateString()}</div>
@@ -324,7 +324,7 @@ function OwnersContent() {
         </div>
         <button 
           className="btn btn-primary rounded-pill px-4 shadow-sm fw-bold text-white border-0 d-flex align-items-center gap-2" 
-          style={{ backgroundColor: '#10B981', transition: 'all 0.2s' }}
+          style={{ backgroundColor: '#014aad', transition: 'all 0.2s' }}
           onClick={openAddModal}
         >
           <i className="bi bi-plus-lg"></i> Add New Owner
@@ -347,7 +347,7 @@ function OwnersContent() {
         </div>
         <div className="col-md-3">
           <div className="bg-white p-3 rounded-xl border shadow-sm d-flex align-items-center gap-3 transition-all hover-lift">
-            <div className="bg-emerald bg-opacity-10 text-emerald rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
+            <div className="bg-emerald bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
               <i className="bi bi-check-circle-fill fs-4"></i>
             </div>
             <div>
@@ -390,7 +390,7 @@ function OwnersContent() {
             key={cat}
             onClick={() => setFilterType(cat === "All" ? "" : cat)}
             className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${((cat === "All" && !filterType) || filterType === cat) ? 'btn-primary shadow-sm' : 'btn-white border text-muted'}`}
-            style={((cat === "All" && !filterType) || filterType === cat) ? { backgroundColor: '#10B981', border: 'none', fontSize: '0.75rem' } : { fontSize: '0.75rem', backgroundColor: '#fff' }}
+            style={((cat === "All" && !filterType) || filterType === cat) ? { backgroundColor: '#014aad', border: 'none', fontSize: '0.75rem' } : { fontSize: '0.75rem', backgroundColor: '#fff' }}
           >
             {cat} Owners
           </button>
@@ -439,14 +439,14 @@ function OwnersContent() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={5} className="text-center py-5"><div className="spinner-border spinner-border-sm text-emerald"></div></td></tr>
+                <tr><td colSpan={5} className="text-center py-5"><div className="spinner-border spinner-border-sm text-primary"></div></td></tr>
               ) : owners.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-5 text-muted small">No records found matching your criteria.</td></tr>
               ) : owners.map((owner) => (
                 <tr key={owner._id} className="hover-bg-light transition-all border-bottom">
                   <td className="px-4 py-3">
                     <div className="d-flex align-items-center gap-3">
-                      <div className="bg-emerald bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-emerald shadow-sm fw-bold" style={{ width: '42px', height: '42px', fontSize: '1rem' }}>
+                      <div className="bg-emerald bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm fw-bold" style={{ width: '42px', height: '42px', fontSize: '1rem' }}>
                         {owner.ownerName.charAt(0)}
                       </div>
                       <div>
@@ -532,9 +532,9 @@ function OwnersContent() {
 
       <style jsx global>{`
         .rounded-xl { border-radius: 1rem !important; }
-        .text-emerald { color: #10B981 !important; }
-        .bg-emerald { background-color: #10B981 !important; }
-        .border-emerald { border-color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
+        .bg-emerald { background-color: #014aad !important; }
+        .border-emerald { border-color: #014aad !important; }
         .hover-bg-light:hover { background-color: #f8fafc !important; }
         .hover-scale:hover { transform: scale(1.15); }
         .transition-all { transition: all 0.2s ease-in-out; }

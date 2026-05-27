@@ -96,7 +96,7 @@ export default function BookingModal({ isOpen, onClose, onSave, editData, mode }
             <div className="modal-body p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               
               <div className="d-flex justify-content-between align-items-center mb-4">
-                <h6 className="fw-bold text-emerald mb-0" style={{ color: '#10B981' }}>Booking Information</h6>
+                <h6 className="fw-bold text-primary mb-0" style={{ color: '#014aad' }}>Booking Information</h6>
                 <div className="badge bg-light text-dark border">ID: {formData.bookingId}</div>
               </div>
               
@@ -135,7 +135,7 @@ export default function BookingModal({ isOpen, onClose, onSave, editData, mode }
 
               <hr className="text-muted" />
 
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Status & Payment</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Status & Payment</h6>
               <div className="row g-3">
                 <div className="col-md-6">
                   <label className="form-label small fw-bold text-muted mb-1">Payment Status</label>
@@ -170,7 +170,7 @@ export default function BookingModal({ isOpen, onClose, onSave, editData, mode }
                 <button 
                   type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

@@ -114,8 +114,8 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
           transition: all 0.2s ease-in-out !important;
         }
         .premium-input:focus {
-          border-color: #10B981 !important;
-          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+          border-color: #014aad !important;
+          box-shadow: 0 0 0 3px rgba(1, 74, 173, 0.15) !important;
           background-color: #ffffff !important;
         }
         .premium-label {
@@ -147,7 +147,7 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
           {/* Modal Header */}
           <div className="modal-header border-bottom p-4 bg-light d-flex justify-content-between align-items-center">
             <div className="d-flex align-items-center gap-2">
-              <div className="bg-emerald bg-opacity-10 text-emerald rounded-3 p-2 d-flex align-items-center justify-content-center" style={{ width: '38px', height: '38px', color: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+              <div className="bg-emerald bg-opacity-10 text-primary rounded-3 p-2 d-flex align-items-center justify-content-center" style={{ width: '38px', height: '38px', color: '#014aad', backgroundColor: 'rgba(1, 74, 173, 0.1)' }}>
                 <i className={`bi ${mode === 'create' ? 'bi-person-plus-fill' : mode === 'edit' ? 'bi-pencil-square' : 'bi-eye-fill'} fs-5`}></i>
               </div>
               <h5 className="modal-title fw-bold text-dark mb-0" style={{ letterSpacing: '-0.01em' }}>
@@ -166,8 +166,8 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
                 <div className="d-flex gap-2 p-1 bg-light rounded-pill align-self-start" style={{ width: '320px', border: '1px solid #e2e8f0' }}>
                   <button 
                     type="button"
-                    className={`btn btn-sm rounded-pill segmented-btn border-0 transition-all flex-grow-1 fw-bold ${formData.ownerType === 'Individual' ? 'bg-white shadow-sm text-emerald' : 'text-muted bg-transparent'}`}
-                    style={formData.ownerType === 'Individual' ? { color: '#059669' } : {}}
+                    className={`btn btn-sm rounded-pill segmented-btn border-0 transition-all flex-grow-1 fw-bold ${formData.ownerType === 'Individual' ? 'bg-white shadow-sm text-primary' : 'text-muted bg-transparent'}`}
+                    style={formData.ownerType === 'Individual' ? { color: '#013a8a' } : {}}
                     disabled={isReadOnly}
                     onClick={() => setFormData({...formData, ownerType: 'Individual'})}
                   >
@@ -175,8 +175,8 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
                   </button>
                   <button 
                     type="button"
-                    className={`btn btn-sm rounded-pill segmented-btn border-0 transition-all flex-grow-1 fw-bold ${formData.ownerType === 'Company' ? 'bg-white shadow-sm text-emerald' : 'text-muted bg-transparent'}`}
-                    style={formData.ownerType === 'Company' ? { color: '#059669' } : {}}
+                    className={`btn btn-sm rounded-pill segmented-btn border-0 transition-all flex-grow-1 fw-bold ${formData.ownerType === 'Company' ? 'bg-white shadow-sm text-primary' : 'text-muted bg-transparent'}`}
+                    style={formData.ownerType === 'Company' ? { color: '#013a8a' } : {}}
                     disabled={isReadOnly}
                     onClick={() => setFormData({...formData, ownerType: 'Company'})}
                   >
@@ -188,7 +188,7 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
               {/* SECTION 1: Account Information */}
               <div className="section-card">
                 <div className="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
-                  <i className="bi bi-shield-lock text-emerald" style={{ color: '#10B981' }}></i>
+                  <i className="bi bi-shield-lock text-primary" style={{ color: '#014aad' }}></i>
                   <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Account & Authentication</h6>
                 </div>
                 <div className="row g-3">
@@ -234,7 +234,7 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
               {formData.ownerType === 'Company' && (
                 <div className="section-card" style={{ animation: 'fadeIn 0.25s ease-out' }}>
                   <div className="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
-                    <i className="bi bi-briefcase text-emerald" style={{ color: '#10B981' }}></i>
+                    <i className="bi bi-briefcase text-primary" style={{ color: '#014aad' }}></i>
                     <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Corporate Details</h6>
                   </div>
                   <div className="row g-3">
@@ -269,7 +269,7 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
               {/* SECTION 3: Contact & Verification */}
               <div className="section-card">
                 <div className="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
-                  <i className="bi bi-telephone text-emerald" style={{ color: '#10B981' }}></i>
+                  <i className="bi bi-telephone text-primary" style={{ color: '#014aad' }}></i>
                   <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Contact & Verification</h6>
                 </div>
                 <div className="row g-3">
@@ -326,7 +326,7 @@ export default function OwnerModal({ isOpen, onClose, onSave, editData, mode }: 
                 <button 
                   type="submit" className="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

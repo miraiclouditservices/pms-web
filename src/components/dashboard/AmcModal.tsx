@@ -170,7 +170,7 @@ export default function AmcModal({ isOpen, onClose, onSave, editData }: AmcModal
               <button 
                 type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm border-0"
                 disabled={isSubmitting}
-                style={{ backgroundColor: '#10B981' }}
+                style={{ backgroundColor: '#014aad' }}
               >
                 {isSubmitting ? 'Saving...' : 'Save AMC'}
               </button>

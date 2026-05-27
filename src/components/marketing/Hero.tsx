@@ -34,7 +34,7 @@ export default function Hero() {
   }, [displayedText, isDeleting, currentWordIndex, typingSpeed]);
 
   return (
-    <section className="hero-dark py-5 pt-md-5 overflow-hidden position-relative" style={{ minHeight: '90vh', display: 'flex', alignItems: 'center', paddingTop: '70px', background: '#022c22' }}>
+    <section className="hero-dark py-5 pt-md-5 overflow-hidden position-relative" style={{ minHeight: '90vh', display: 'flex', alignItems: 'center', paddingTop: '70px', background: '#001233' }}>
       {/* Refined Dynamic Background Mesh */}
       <div className="hero-mesh-refined"></div>
 
@@ -49,7 +49,7 @@ export default function Hero() {
             {/* Main Heading */}
             <h1 className="display-4 fw-bold text-white mb-4 animate__animated animate__fadeIn tracking-tight" style={{ lineHeight: '1.2' }}>
               Office security, <br className="d-md-none" />
-              <span className="text-emerald typing-cursor">{displayedText}</span>
+              <span className="text-primary typing-cursor">{displayedText}</span>
             </h1>
 
             {/* Premium Subtitle */}
@@ -90,20 +90,20 @@ export default function Hero() {
           left: 0;
           width: 100%;
           height: 100%;
-          background: radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
-                      radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 50%);
+          background: radial-gradient(circle at 0% 0%, rgba(1, 74, 173, 0.08) 0%, transparent 50%),
+                      radial-gradient(circle at 100% 100%, rgba(1, 74, 173, 0.05) 0%, transparent 50%);
           z-index: 0;
         }
-        .text-emerald { color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
         .btn-emerald-vibrant {
-          background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+          background: linear-gradient(135deg, #014aad 0%, #013a8a 100%);
           border: none;
           color: white !important;
-          box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+          box-shadow: 0 10px 20px -5px rgba(1, 74, 173, 0.4);
         }
         .btn-emerald-vibrant:hover {
-          background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
-          box-shadow: 0 15px 30px -5px rgba(16, 185, 129, 0.5);
+          background: linear-gradient(135deg, #3b82f6 0%, #014aad 100%);
+          box-shadow: 0 15px 30px -5px rgba(1, 74, 173, 0.5);
           transform: translateY(-3px);
         }
         .btn-glass-white {

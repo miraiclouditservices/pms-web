@@ -38,7 +38,7 @@ export default function Roles() {
             <div className="col-lg-4 col-md-6" key={index}>
               <div className="card h-100 border-0 shadow-sm p-4" style={{ borderRadius: '1.25rem' }}>
                 <div className="d-flex align-items-center mb-3">
-                  <div className="text-emerald d-flex align-items-center justify-content-center me-3" style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)' }}>
+                  <div className="text-primary d-flex align-items-center justify-content-center me-3" style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(1, 74, 173, 0.08)' }}>
                     <i className={`bi ${role.icon} fs-5`}></i>
                   </div>
                   <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '1rem' }}>{role.title}</h6>
@@ -47,7 +47,7 @@ export default function Roles() {
                 <ul className="list-unstyled mb-0">
                   {role.features.map((feature, idx) => (
                     <li className="mb-2 d-flex align-items-center" key={idx}>
-                      <i className="bi bi-check2 text-emerald me-2 fw-bold" style={{ fontSize: '0.9rem' }}></i>
+                      <i className="bi bi-check2 text-primary me-2 fw-bold" style={{ fontSize: '0.9rem' }}></i>
                       <span className="fw-medium text-dark" style={{ fontSize: '0.85rem' }}>{feature}</span>
                     </li>
                   ))}
@@ -58,7 +58,7 @@ export default function Roles() {
         </div>
       </div>
       <style jsx>{`
-        .text-emerald { color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
       `}</style>
     </section>
   );

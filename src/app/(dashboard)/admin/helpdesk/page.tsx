@@ -31,6 +31,8 @@ export default function HelpdeskPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   useEffect(() => {
     fetchComplaints();
     fetchStats();
@@ -40,9 +42,10 @@ export default function HelpdeskPage() {
       if (storedUser) {
         try {
           const u = JSON.parse(storedUser);
-          if (u.role === "Admin") {
+          setCurrentUser(u);
+          if (u.role === "Admin" || u.role === "Super Admin") {
             setUserRole("super_admin");
-          } else if (u.role === "Owner") {
+          } else if (u.role === "Owner" || u.role === "Office Owner") {
             setUserRole("technician");
           } else {
             setUserRole("viewer");
@@ -83,6 +86,15 @@ export default function HelpdeskPage() {
   const technicians = Array.from(new Set(complaints.map(c => c.allocatedTo).filter(Boolean)));
 
   const filteredComplaints = complaints.filter(c => {
+    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "Office Owner";
+    if (isOwner) {
+      const matchName = (c.tenant?.tenantName || "").toLowerCase().includes(currentUser.name.toLowerCase()) ||
+                        (c.tenant?.companyName || "").toLowerCase().includes((currentUser.companyName || "").toLowerCase()) ||
+                        (c.allocatedTo || "").toLowerCase().includes(currentUser.name.toLowerCase());
+      const matchCreator = c.createdBy === currentUser._id || c.tenant?.user === currentUser._id;
+      if (!matchName && !matchCreator) return false;
+    }
+
     const matchesSearch = 
       (c.ticketNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
       (c.natureOfComplaint || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,7 +153,7 @@ export default function HelpdeskPage() {
           {userRole !== 'viewer' && (
             <button 
               className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold text-white border-0" 
-              style={{ backgroundColor: '#10B981', fontSize: '0.75rem' }}
+              style={{ backgroundColor: '#014aad', fontSize: '0.75rem' }}
               onClick={() => handleOpenModal('create')}
             >
               <i className="bi bi-plus-lg me-1"></i> Raise Ticket
@@ -193,7 +205,7 @@ export default function HelpdeskPage() {
           </div>
         </div>
         <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#10B981' }}>
+          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#014aad' }}>
             <div className="d-flex justify-content-between align-items-center mb-2">
               <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Closed</div>
               <div className="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-check-all"></i></div>
@@ -278,7 +290,7 @@ export default function HelpdeskPage() {
                   onClick={() => handleOpenModal('view', c)}
                 >
                   <td className="px-3 py-3 fw-bold text-muted">{indexOfFirstItem + index + 1}</td>
-                  <td className="px-3 py-3 fw-bold text-emerald">{c.ticketNumber}</td>
+                  <td className="px-3 py-3 fw-bold text-primary">{c.ticketNumber}</td>
                   <td className="px-3 py-3 fw-medium text-dark">{c.natureOfComplaint}</td>
                   <td className="px-3 py-3 text-muted">{c.dateOfComplaint ? new Date(c.dateOfComplaint).toLocaleDateString() : '-'} {c.timeOfComplaint}</td>
                   <td className="px-3 py-3">
@@ -356,7 +368,7 @@ export default function HelpdeskPage() {
               <button 
                 key={page}
                 className={`btn btn-sm border-0 px-3 shadow-none ${currentPage === page ? 'btn-primary text-white' : 'btn-white border'}`}
-                style={currentPage === page ? { backgroundColor: '#10B981' } : {}}
+                style={currentPage === page ? { backgroundColor: '#014aad' } : {}}
                 onClick={() => setCurrentPage(page)}
               >
                 {page}
@@ -375,8 +387,8 @@ export default function HelpdeskPage() {
 
       <style jsx global>{`
         .hover-lift:hover { transform: translateY(-3px); }
-        .text-emerald { color: #10B981 !important; }
-        .bg-emerald { background-color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
+        .bg-emerald { background-color: #014aad !important; }
         .rounded-xl { border-radius: 1rem !important; }
         .hover-bg-light:hover { background-color: rgba(0,0,0,0.02) !important; }
       `}</style>

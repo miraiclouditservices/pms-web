@@ -19,11 +19,15 @@ export const fetchApi = async (endpoint: string, options: any = {}) => {
 
     if (!response.ok) {
         if (response.status === 401 && typeof window !== 'undefined') {
-            // Clear invalid token and user data
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            // Redirect to login page
-            window.location.href = '/';
+            // Do not force redirect for login or register endpoints
+            const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+            if (!isAuthEndpoint) {
+                // Clear invalid token and user datanpm run dev
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                // Redirect to login page
+                window.location.href = '/login';
+            }
         }
         throw new Error(data.error || 'Something went wrong');
     }
@@ -35,5 +39,6 @@ export const api = {
     get: (endpoint: string) => fetchApi(endpoint, { method: 'GET' }),
     post: (endpoint: string, body: any) => fetchApi(endpoint, { method: 'POST', body: JSON.stringify(body) }),
     put: (endpoint: string, body: any) => fetchApi(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
+    patch: (endpoint: string, body: any) => fetchApi(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (endpoint: string) => fetchApi(endpoint, { method: 'DELETE' }),
 };

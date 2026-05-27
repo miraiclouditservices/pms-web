@@ -94,7 +94,7 @@ export default function FloorDetailModal({ isOpen, onClose, onSave, editData, mo
           <form onSubmit={handleSubmit}>
             <div className="modal-body p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Unit Information</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Unit Information</h6>
               <div className="row g-3 mb-4">
                 <div className="col-md-3">
                   <label className="form-label small fw-bold text-muted mb-1">Unit ID</label>
@@ -130,7 +130,7 @@ export default function FloorDetailModal({ isOpen, onClose, onSave, editData, mo
 
               <hr className="text-muted" />
 
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Owner Details</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Owner Details</h6>
               <div className="row g-3 mb-4">
                 <div className="col-md-6">
                   <label className="form-label small fw-bold text-muted mb-1">Owner Name</label>
@@ -151,7 +151,7 @@ export default function FloorDetailModal({ isOpen, onClose, onSave, editData, mo
 
               <hr className="text-muted" />
 
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Lease Holder Details & Remarks</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Lease Holder Details & Remarks</h6>
               <div className="row g-3">
                 <div className="col-md-6">
                   <label className="form-label small fw-bold text-muted mb-1">Lease Holder Name</label>
@@ -183,7 +183,7 @@ export default function FloorDetailModal({ isOpen, onClose, onSave, editData, mo
                 <button 
                   type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

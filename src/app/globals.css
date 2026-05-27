@@ -3,9 +3,9 @@
 
 :root {
   /* Enterprise SaaS Color Palette (Refined) */
-  --primary: #10B981;
-  --primary-dark: #064E3B;
-  --primary-light: #D1FAE5;
+  --primary: #014aad;
+  --primary-dark: #002855;
+  --primary-light: #dbeafe;
   --secondary: #64748B; /* Slate for secondary text/icons */
   --bg-app: #F8FAFC;
   --bg-card: #FFFFFF;
@@ -44,9 +44,10 @@
 }
 
 body {
-  background-color: var(--color-bg-light); /* Soft gray/white */
+  background-color: #FFFFFF !important;
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   color: var(--color-text-main);
+  overflow-x: hidden;
 }
 
 /* Custom Utilities */
@@ -129,7 +130,7 @@ body {
   content: "|";
   animation: blink 1s step-end infinite;
   margin-left: 2px;
-  color: #10B981;
+  color: var(--primary);
 }
 
 @keyframes blink {
@@ -139,7 +140,7 @@ body {
 
 /* Premium Hero Styles */
 .hero-dark {
-  background: radial-gradient(circle at top, #064E3B 0%, #022c22 100%);
+  background: radial-gradient(circle at top, #002855 0%, #001233 100%);
   position: relative;
   overflow: hidden;
 }
@@ -151,21 +152,21 @@ body {
   transform: translate(-50%, -50%);
   width: 500px;
   height: 500px;
-  background: #10B981;
+  background: var(--primary);
   filter: blur(150px);
   opacity: 0.15;
   pointer-events: none;
 }
 
 .text-gradient-animated {
-  background: linear-gradient(135deg, #10B981 0%, #3B82F6 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #3B82F6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
+  box-shadow: 0 0 20px rgba(1, 74, 173, 0.4) !important;
 }
 
 .transition-all {

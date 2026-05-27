@@ -1,0 +1,15 @@
+
+.container { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.titleGroup h2 { font-size: 1.75rem; font-weight: 700; color: #111827; margin: 0 0 0.5rem 0; }
+.titleGroup p { color: #6b7280; margin: 0; }
+.tableWrapper { background: white; border-radius: 1rem; padding: 0; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.table { width: 100%; margin: 0; border-collapse: collapse; }
+.th { padding: 1rem 1.5rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+.tr { border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s; }
+.tr:last-child { border-bottom: none; }
+.tr:hover { background-color: #f9fafb; }
+.td { padding: 1rem 1.5rem; vertical-align: middle; }
+.actionBtn { background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.5rem; border-radius: 0.5rem; transition: all 0.2s; }
+.actionBtn:hover { background-color: #f3f4f6; color: #111827; }
+.statusBadge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; }

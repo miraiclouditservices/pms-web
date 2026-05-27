@@ -31,7 +31,7 @@ export default function HowItWorks() {
             <div className="col-md-4" key={index}>
               <div className="card h-100 border-0 bg-transparent">
                 <div className="card-body text-center px-4 py-2">
-                  <div className="text-emerald d-flex align-items-center justify-content-center mx-auto mb-3 fw-bold" style={{ width: '40px', height: '40px', fontSize: '1.2rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px' }}>
+                  <div className="text-primary d-flex align-items-center justify-content-center mx-auto mb-3 fw-bold" style={{ width: '40px', height: '40px', fontSize: '1.2rem', background: 'rgba(1, 74, 173, 0.08)', borderRadius: '10px' }}>
                     {s.step}
                   </div>
                   <h6 className="fw-bold text-dark mb-2" style={{ fontSize: '0.95rem' }}>{s.title}</h6>
@@ -43,7 +43,7 @@ export default function HowItWorks() {
         </div>
       </div>
       <style jsx>{`
-        .text-emerald { color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
       `}</style>
     </section>
   );

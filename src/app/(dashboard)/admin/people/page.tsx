@@ -106,12 +106,12 @@ export default function PeoplePage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} className="text-center py-5"><div className="spinner-border text-emerald"></div></td></tr>
+              <tr><td colSpan={6} className="text-center py-5"><div className="spinner-border text-primary"></div></td></tr>
             ) : users.map((user) => (
               <tr key={user._id} className={styles.tr}>
                 <td className={styles.td}>
                   <div className="d-flex align-items-center gap-3">
-                    <div className="rounded-circle bg-light d-flex align-items-center justify-content-center fw-bold text-emerald" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>
+                    <div className="rounded-circle bg-light d-flex align-items-center justify-content-center fw-bold text-primary" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>
                       {user.name.charAt(0)}
                     </div>
                     <div className="d-flex flex-column">

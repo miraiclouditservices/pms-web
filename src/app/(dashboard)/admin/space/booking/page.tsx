@@ -122,7 +122,7 @@ export default function BookingPage() {
           <div className="d-flex align-items-center bg-light rounded-pill p-1">
             <span className="small fw-bold text-muted px-2">Role:</span>
             <select 
-              className="form-select form-select-sm border-0 bg-transparent fw-bold text-emerald shadow-none py-0" 
+              className="form-select form-select-sm border-0 bg-transparent fw-bold text-primary shadow-none py-0" 
               value={userRole} 
               onChange={(e) => setUserRole(e.target.value)}
               style={{ width: '130px', cursor: 'pointer' }}
@@ -138,7 +138,7 @@ export default function BookingPage() {
           {userRole !== 'viewer' && (
             <button 
               className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold text-white border-0" 
-              style={{ backgroundColor: '#10B981', fontSize: '0.75rem' }}
+              style={{ backgroundColor: '#014aad', fontSize: '0.75rem' }}
               onClick={() => handleOpenModal('create')}
             >
               <i className="bi bi-plus-lg me-1"></i> New Booking
@@ -160,7 +160,7 @@ export default function BookingPage() {
           </div>
         </div>
         <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#10B981 !important' }}>
+          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#014aad !important' }}>
             <div className="d-flex justify-content-between align-items-center mb-2">
               <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Confirmed</div>
               <div className="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-calendar-check"></i></div>
@@ -263,7 +263,7 @@ export default function BookingPage() {
               {filteredBookings.map((b, index) => (
                 <tr key={b._id} className="transition-all hover-bg-light" style={{ fontSize: '0.85rem' }}>
                   <td className="px-3 py-3 fw-bold text-muted">{index + 1}</td>
-                  <td className="px-3 py-3 fw-bold text-emerald">{b.bookingId || b.id}</td>
+                  <td className="px-3 py-3 fw-bold text-primary">{b.bookingId || b.id}</td>
                   <td className="px-3 py-3 fw-medium text-dark">{b.bookingParticulars || b.particulars}</td>
                   <td className="px-3 py-3 text-muted">{b.dateTimeOfBooking ? new Date(b.dateTimeOfBooking).toLocaleString() : '-'}</td>
                   <td className="px-3 py-3 fw-medium text-muted">{b.fromDate ? new Date(b.fromDate).toLocaleDateString() : '-'}</td>
@@ -337,7 +337,7 @@ export default function BookingPage() {
           </span>
           <div className="d-flex gap-1">
             <button className="btn btn-sm btn-white border px-2 shadow-none" disabled><i className="bi bi-chevron-left"></i></button>
-            <button className="btn btn-sm btn-primary border-0 px-3 shadow-none" style={{ backgroundColor: '#10B981' }}>1</button>
+            <button className="btn btn-sm btn-primary border-0 px-3 shadow-none" style={{ backgroundColor: '#014aad' }}>1</button>
             <button className="btn btn-sm btn-white border px-3 shadow-none">2</button>
             <span className="px-2 align-self-center text-muted">...</span>
             <button className="btn btn-sm btn-white border px-3 shadow-none">12</button>
@@ -348,8 +348,8 @@ export default function BookingPage() {
 
       <style jsx global>{`
         .hover-lift:hover { transform: translateY(-3px); }
-        .text-emerald { color: #10B981 !important; }
-        .bg-emerald { background-color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
+        .bg-emerald { background-color: #014aad !important; }
         .rounded-xl { border-radius: 1rem !important; }
         .hover-bg-light:hover { background-color: rgba(0,0,0,0.02) !important; }
       `}</style>

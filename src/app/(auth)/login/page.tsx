@@ -26,7 +26,12 @@ export default function LoginPage() {
 
     try {
       // Map frontend selection to backend roles
-      const role = selectedRole === 'super_admin' ? 'Admin' : 'Owner';
+      const roleMap: Record<string, string> = {
+        super_admin: 'Super Admin',
+        floor_admin: 'Floor Admin',
+        office_owner: 'Office Owner',
+      };
+      const role = roleMap[selectedRole] || 'Super Admin';
       
       const response = await api.post('/auth/login', { 
         email, 
@@ -38,8 +43,8 @@ export default function LoginPage() {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.user));
         
-        // Redirect based on role or to common dashboard
-        if (response.user.role === "Admin" || response.user.role === "Owner" || response.user.role === "Staff") {
+        // Redirect based on role
+        if (response.user.role === "Super Admin" || response.user.role === "Staff Admin" || response.user.role === "Floor Admin" || response.user.role === "Office Owner") {
            router.replace('/admin/dashboard');
         }
       }
@@ -55,7 +60,7 @@ export default function LoginPage() {
       {/* Brand Side (Visible on Desktop) */}
       <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-between p-5 position-relative overflow-hidden" 
            style={{ 
-             background: 'linear-gradient(135deg, #064E3B 0%, #10B981 100%)',
+             background: 'linear-gradient(135deg, #002855 0%, #014aad 100%)',
              color: 'white'
            }}>
         {/* Animated Background Mesh */}
@@ -66,7 +71,7 @@ export default function LoginPage() {
 
         <div className="position-relative z-1">
           <div className="d-flex align-items-center gap-3 mb-5">
-            <div className="bg-white text-emerald rounded-circle d-flex align-items-center justify-content-center shadow-lg" style={{ width: '48px', height: '48px' }}>
+            <div className="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center shadow-lg" style={{ width: '48px', height: '48px' }}>
               <i className="bi bi-shield-check fs-4"></i>
             </div>
             <span className="fw-bold fs-4 tracking-tight">PMS GLOBAL</span>
@@ -106,21 +111,29 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin}>
-            {/* Role Switcher */}
-            <div className="mb-4 bg-light p-1 rounded-pill d-flex">
+            {/* Role Switcher — 3 tabs */}
+            <div className="mb-4 bg-light p-1 rounded-pill d-flex gap-1">
               <button 
                 type="button" 
                 onClick={() => setSelectedRole('super_admin')}
-                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'super_admin' ? 'bg-white shadow-sm text-emerald' : 'text-muted'}`}
-                style={{ fontSize: '0.7rem' }}
+                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'super_admin' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`}
+                style={{ fontSize: '0.65rem' }}
               >
                 Super Admin
               </button>
               <button 
                 type="button" 
+                onClick={() => setSelectedRole('floor_admin')}
+                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'floor_admin' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`}
+                style={{ fontSize: '0.65rem' }}
+              >
+                Floor Admin
+              </button>
+              <button 
+                type="button" 
                 onClick={() => setSelectedRole('office_owner')}
-                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'office_owner' ? 'bg-white shadow-sm text-emerald' : 'text-muted'}`}
-                style={{ fontSize: '0.7rem' }}
+                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'office_owner' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`}
+                style={{ fontSize: '0.65rem' }}
               >
                 Office Owner
               </button>
@@ -129,7 +142,7 @@ export default function LoginPage() {
             {/* Form Fields */}
             <div className="mb-3">
               <label className="form-label text-muted small fw-bold text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.05em' }}>Corporate Identity</label>
-              <div className="input-group border-bottom pb-1">
+              <div className="input-group border-bottom pb-1 position-relative">
                 <span className="input-group-text bg-transparent border-0 px-0 me-3"><i className="bi bi-envelope text-muted" style={{ fontSize: '0.85rem' }}></i></span>
                 <input 
                   type="email" 
@@ -185,32 +198,32 @@ export default function LoginPage() {
 
           <div className="text-center mb-4">
             <p className="text-muted small mb-0">
-              Don't have an account? <Link href="/register" className="text-emerald fw-bold text-decoration-none">Create One</Link>
+              System Initialization? <Link href="/register" className="text-primary fw-bold text-decoration-none">Create Super Admin</Link>
             </p>
           </div>
 
           <div className="text-center pt-3 border-top">
-            <Link href="/" className="text-decoration-none text-muted fw-bold hover-text-emerald transition-all" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+            <Link href="/" className="text-decoration-none text-muted fw-bold hover-text-primary transition-all" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
               <i className="bi bi-arrow-left me-2"></i>RETURN TO MAIN INTERFACE
             </Link>
           </div>
         </div>
       </div>
 
-      <style jsx global>{`
-        .bg-emerald { background-color: #10B981 !important; }
-        .text-emerald { color: #10B981 !important; }
-        .btn-emerald { background-color: #10B981; border: none; }
-        .btn-emerald:hover { background-color: #059669; transform: translateY(-1px); }
-        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
+      <style dangerouslySetInnerHTML={{__html: `
+        .bg-emerald { background-color: #014aad !important; }
+        .text-primary { color: #014aad !important; }
+        .btn-emerald { background-color: #014aad; border: none; }
+        .btn-emerald:hover { background-color: #013a8a; transform: translateY(-1px); }
+        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(1, 74, 173, 0.3); }
         .hover-lift:hover { transform: translateY(-2px); }
-        .hover-text-emerald:hover { color: #10B981 !important; }
+        .hover-text-primary:hover { color: #014aad !important; }
         .tracking-tight { letter-spacing: -0.02em; }
         .input-group-text { min-width: 24px; }
         @media (max-width: 991.98px) {
           .min-vh-100 { overflow-y: auto !important; }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }

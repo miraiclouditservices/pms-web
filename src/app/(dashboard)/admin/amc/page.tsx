@@ -59,7 +59,7 @@ function AMCContent() {
                 setSelectedAmc(null);
                 setIsModalOpen(true);
             }}
-            style={{ backgroundColor: '#10B981', height: '42px' }}
+            style={{ backgroundColor: '#014aad', height: '42px' }}
           >
             <i className="bi bi-plus-lg"></i> Add AMC
           </button>

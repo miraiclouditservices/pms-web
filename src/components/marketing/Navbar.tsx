@@ -54,16 +54,16 @@ export default function Navbar() {
         <div className="collapse navbar-collapse h-100" id="navbarContent">
           <ul className="navbar-nav mx-auto mb-2 mb-lg-0 fw-bold">
             <li className="nav-item">
-              <a className={`nav-link px-3 transition-all ${activeSection === 'features' ? 'text-emerald' : 'text-muted hover-text-emerald'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#features">Features</a>
+              <a className={`nav-link px-3 transition-all ${activeSection === 'features' ? 'text-primary' : 'text-muted hover-text-primary'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#features">Features</a>
             </li>
             <li className="nav-item">
-              <a className={`nav-link px-3 transition-all ${activeSection === 'how-it-works' ? 'text-emerald' : 'text-muted hover-text-emerald'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#how-it-works">How it works</a>
+              <a className={`nav-link px-3 transition-all ${activeSection === 'how-it-works' ? 'text-primary' : 'text-muted hover-text-primary'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#how-it-works">How it works</a>
             </li>
             <li className="nav-item">
-              <a className={`nav-link px-3 transition-all ${activeSection === 'pricing' ? 'text-emerald' : 'text-muted hover-text-emerald'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#pricing">Pricing</a>
+              <a className={`nav-link px-3 transition-all ${activeSection === 'pricing' ? 'text-primary' : 'text-muted hover-text-primary'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#pricing">Pricing</a>
             </li>
             <li className="nav-item">
-              <a className={`nav-link px-3 transition-all ${activeSection === 'faq' ? 'text-emerald' : 'text-muted hover-text-emerald'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#faq">FAQ</a>
+              <a className={`nav-link px-3 transition-all ${activeSection === 'faq' ? 'text-primary' : 'text-muted hover-text-primary'}`} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }} href="#faq">FAQ</a>
             </li>
           </ul>
           <div className="d-flex align-items-center">
@@ -72,13 +72,13 @@ export default function Navbar() {
         </div>
       </div>
       <style jsx global>{`
-        .bg-emerald { background-color: #10B981 !important; }
-        .text-emerald { color: #10B981 !important; }
-        .btn-emerald { background-color: #10B981; border: none; }
-        .btn-emerald:hover { background-color: #059669; transform: translateY(-1px); }
-        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
+        .bg-emerald { background-color: #014aad !important; }
+        .text-primary { color: #014aad !important; }
+        .btn-emerald { background-color: #014aad; border: none; }
+        .btn-emerald:hover { background-color: #013a8a; transform: translateY(-1px); }
+        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(1, 74, 173, 0.3); }
         .hover-lift:hover { transform: translateY(-2px); }
-        .hover-text-emerald:hover { color: #10B981 !important; }
+        .hover-text-primary:hover { color: #014aad !important; }
         .rounded-xl { border-radius: 1rem !important; }
         .tracking-tight { letter-spacing: -0.02em; }
       `}</style>

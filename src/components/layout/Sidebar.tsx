@@ -39,47 +39,68 @@ export default function Sidebar() {
     : "Super Admin";
   const avatarChar = displayName ? displayName.charAt(0).toUpperCase() : "A";
 
+  const isSuperAdmin = user?.role === "Super Admin";
+  const permissions = (user as any)?.permissions || [];
+
+  const hasAccess = (permission: string) => isSuperAdmin || permissions.includes(permission);
+
   const menuGroups = [
     {
       label: "Main",
       items: [
-        { name: "Dashboard", path: "/admin/dashboard", icon: "bi-grid-1x2-fill" },
-        { name: user?.role === "Owner" ? "My Office" : "Properties", path: "/admin/properties", icon: "bi-building-fill" },
-        ...(user?.role === "Admin" ? [
-          { name: "Owners", path: "/admin/owners", icon: "bi-people-fill" }
+        ...(isSuperAdmin || permissions.length > 0 ? [{ name: "Dashboard", path: "/admin/dashboard", icon: "bi-grid-1x2-fill" }] : []),
+        ...(hasAccess('view_properties') ? [{ name: "Properties", path: "/admin/properties", icon: "bi-building-fill" }] : []),
+        ...(hasAccess('view_floors') ? [{ name: "Floors", path: "/admin/floors", icon: "bi-layers-fill" }] : []),
+        ...(hasAccess('view_floors') ? [{ name: "Units / Flats", path: "/admin/units", icon: "bi-door-open-fill" }] : []),
+        ...(hasAccess('view_tenants') ? [{ name: "Leases", path: "/admin/leases", icon: "bi-file-earmark-text-fill" }] : []),
+        ...(hasAccess('view_finance') ? [
+            { name: "Finance / Billing", path: "/admin/finance", icon: "bi-receipt" }
         ] : []),
-        { name: "Leases", path: "/admin/leases", icon: "bi-file-earmark-text-fill" },
+        ...(user?.role === 'Super Admin' || user?.role === 'Floor Admin' || user?.role === 'Owner' || user?.role === 'Office Owner' ? [
+            { name: "Payments", path: "/admin/payments", icon: "bi-credit-card-fill" }
+        ] : []),
       ]
     },
     {
       label: "Operations",
       items: [
-        ...(user?.role === "Admin" ? [
-          { name: "Assets", path: "/admin/assets", icon: "bi-box-seam-fill" },
-          { name: "AMC", path: "/admin/amc", icon: "bi-calendar-check-fill" },
-          { name: "Vendors", path: "/admin/vendors", icon: "bi-truck" },
+        ...(hasAccess('manage_helpdesk') ? [
+          { name: "Helpdesk", path: "/admin/helpdesk", icon: "bi-headset" }
         ] : []),
-        { name: "Visitors", path: "/admin/visitors", icon: "bi-person-badge-fill" },
+        ...(hasAccess('manage_visitors') ? [
+            { name: "Visitors", path: "/admin/visitors", icon: "bi-person-badge-fill" },
+            { name: "Materials", path: "/admin/materials", icon: "bi-cart-fill" },
+            { name: "Bookings", path: "/admin/bookings", icon: "bi-calendar-event-fill" }
+        ] : [])
       ]
     },
     {
       label: "Management",
       items: [
-        { name: "Materials", path: "/admin/materials", icon: "bi-cart-fill" },
-        { name: "Helpdesk", path: "/admin/helpdesk", icon: "bi-headset" },
-        { name: "Bookings", path: "/admin/bookings", icon: "bi-calendar-event-fill" },
+        ...(hasAccess('manage_staff') ? [
+          { name: "Staff Management", path: "/admin/users", icon: "bi-person-badge" },
+        ] : []),
+        ...(hasAccess('view_analytics') ? [
+            { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "bi-pie-chart-fill" }
+        ] : [])
       ]
     },
-    ...(user?.role === "Admin" ? [
-      {
-        label: "Intelligence",
-        items: [
-          { name: "Reports", path: "/admin/reports", icon: "bi-bar-chart-line-fill" },
-          { name: "Settings", path: "/admin/settings", icon: "bi-gear-wide-connected" },
-        ]
-      }
-    ] : [])
-  ];
+    {
+      label: "Account",
+      items: [
+        { name: "Settings & Profile", path: "/admin/settings", icon: "bi-gear-fill" }
+      ]
+    }
+  ].map(group => {
+    if (user?.role === "Owner" || user?.role === "Office Owner") {
+      const itemsToRemove = ["Properties", "Floors", "Units / Flats", "Tenants", "Leases", "Owners", "Assets", "Vendors"];
+      return {
+        ...group,
+        items: group.items.filter(item => !itemsToRemove.includes(item.name))
+      };
+    }
+    return group;
+  }).filter(group => group.items.length > 0);
 
   return (
     <aside className={styles.sidebar}>

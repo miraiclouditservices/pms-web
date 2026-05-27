@@ -103,7 +103,7 @@ export default function VendorModal({ isOpen, onClose, onSave, editData, mode }:
           <form onSubmit={handleSubmit}>
             <div className="modal-body p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Company Information</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Company Information</h6>
               <div className="row g-3 mb-4">
                 <div className="col-md-4">
                   <label className="form-label small fw-bold text-muted mb-1">Vendor Code</label>
@@ -129,7 +129,7 @@ export default function VendorModal({ isOpen, onClose, onSave, editData, mode }:
 
               <hr className="text-muted" />
 
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Contact & Status</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Contact & Status</h6>
               <div className="row g-3">
                 <div className="col-md-4">
                   <label className="form-label small fw-bold text-muted mb-1">Contact Name</label>
@@ -174,7 +174,7 @@ export default function VendorModal({ isOpen, onClose, onSave, editData, mode }:
                 <button 
                   type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

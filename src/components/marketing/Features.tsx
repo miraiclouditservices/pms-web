@@ -38,7 +38,7 @@ export default function Features() {
     <section id="features" className="py-5 bg-white overflow-hidden">
       <div className="container py-5">
         <div className="text-center mb-5">
-          <span className="text-emerald fw-bold text-uppercase mb-2 d-block" style={{ fontSize: '0.65rem', letterSpacing: '0.2rem' }}>Capabilities</span>
+          <span className="text-primary fw-bold text-uppercase mb-2 d-block" style={{ fontSize: '0.65rem', letterSpacing: '0.2rem' }}>Capabilities</span>
           <h2 className="fw-bold text-dark mb-2" style={{ letterSpacing: '-0.02em', fontSize: '1.75rem' }}>The Security Command Suite</h2>
           <p className="text-muted mx-auto" style={{ maxWidth: '500px', fontSize: '0.9rem' }}>High-performance tools engineered for global property oversight and rapid security response.</p>
         </div>

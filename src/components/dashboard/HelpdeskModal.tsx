@@ -109,7 +109,7 @@ export default function HelpdeskModal({ isOpen, onClose, onSave, editData, mode 
             <div className="modal-body p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               
               <div className="d-flex justify-content-between align-items-center mb-4">
-                <h6 className="fw-bold text-emerald mb-0" style={{ color: '#10B981' }}>Complaint Information</h6>
+                <h6 className="fw-bold text-primary mb-0" style={{ color: '#014aad' }}>Complaint Information</h6>
                 <div className="badge bg-light text-dark border">Ticket No: {formData.ticketNumber}</div>
               </div>
               
@@ -143,7 +143,7 @@ export default function HelpdeskModal({ isOpen, onClose, onSave, editData, mode 
 
               <hr className="text-muted" />
 
-              <h6 className="fw-bold text-emerald mb-3" style={{ color: '#10B981' }}>Resolution Details</h6>
+              <h6 className="fw-bold text-primary mb-3" style={{ color: '#014aad' }}>Resolution Details</h6>
               <div className="row g-3">
                 <div className="col-md-4">
                   <label className="form-label small fw-bold text-muted mb-1">Status</label>
@@ -197,7 +197,7 @@ export default function HelpdeskModal({ isOpen, onClose, onSave, editData, mode 
                 <button 
                   type="submit" className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm text-white border-0"
                   disabled={isSubmitting}
-                  style={{ backgroundColor: '#10B981', fontSize: '0.85rem' }}
+                  style={{ backgroundColor: '#014aad', fontSize: '0.85rem' }}
                 >
                   {isSubmitting ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

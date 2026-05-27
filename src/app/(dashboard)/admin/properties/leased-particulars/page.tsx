@@ -133,7 +133,7 @@ export default function LeasedParticularsPage() {
           <div className="d-flex align-items-center bg-light rounded-pill p-1">
             <span className="small fw-bold text-muted px-2">Role:</span>
             <select 
-              className="form-select form-select-sm border-0 bg-transparent fw-bold text-emerald shadow-none py-0" 
+              className="form-select form-select-sm border-0 bg-transparent fw-bold text-primary shadow-none py-0" 
               value={userRole} 
               onChange={(e) => setUserRole(e.target.value)}
               style={{ width: '130px', cursor: 'pointer' }}
@@ -149,7 +149,7 @@ export default function LeasedParticularsPage() {
           {userRole !== 'viewer' && (
             <button 
               className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold text-white border-0" 
-              style={{ backgroundColor: '#10B981', fontSize: '0.75rem' }}
+              style={{ backgroundColor: '#014aad', fontSize: '0.75rem' }}
               onClick={() => handleOpenModal('create')}
             >
               <i className="bi bi-plus-lg me-1"></i> Add New Lease
@@ -251,7 +251,7 @@ export default function LeasedParticularsPage() {
               {filteredLeases.map((lease, index) => (
                 <tr key={lease.id} className="transition-all hover-bg-light" style={{ fontSize: '0.85rem' }}>
                   <td className="px-3 py-3 fw-bold text-muted">{index + 1}</td>
-                  <td className="px-3 py-3 fw-bold text-emerald">{lease.id}</td>
+                  <td className="px-3 py-3 fw-bold text-primary">{lease.id}</td>
                   <td className="px-3 py-3 fw-medium text-dark">{lease.holderName}</td>
                   <td className="px-3 py-3 text-muted">{lease.startDate}</td>
                   <td className="px-3 py-3 text-muted">{lease.endDate}</td>
@@ -301,7 +301,7 @@ export default function LeasedParticularsPage() {
           </span>
           <div className="d-flex gap-1">
             <button className="btn btn-sm btn-white border px-2 shadow-none" disabled><i className="bi bi-chevron-left"></i></button>
-            <button className="btn btn-sm btn-primary border-0 px-3 shadow-none" style={{ backgroundColor: '#10B981' }}>1</button>
+            <button className="btn btn-sm btn-primary border-0 px-3 shadow-none" style={{ backgroundColor: '#014aad' }}>1</button>
             <button className="btn btn-sm btn-white border px-3 shadow-none">2</button>
             <button className="btn btn-sm btn-white border px-3 shadow-none">3</button>
             <span className="px-2 align-self-center text-muted">...</span>
@@ -313,8 +313,8 @@ export default function LeasedParticularsPage() {
 
       <style jsx global>{`
         .hover-lift:hover { transform: translateY(-3px); }
-        .text-emerald { color: #10B981 !important; }
-        .bg-emerald { background-color: #10B981 !important; }
+        .text-primary { color: #014aad !important; }
+        .bg-emerald { background-color: #014aad !important; }
         .rounded-xl { border-radius: 1rem !important; }
         .hover-bg-light:hover { background-color: rgba(0,0,0,0.02) !important; }
       `}</style>

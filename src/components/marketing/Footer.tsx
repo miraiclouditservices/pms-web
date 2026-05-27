@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function Footer() {
   return (
-    <footer className="text-white pt-5 pb-4" style={{ backgroundColor: '#022c22', borderTop: '1px solid rgba(16, 185, 129, 0.2)' }}>
+    <footer className="text-white pt-5 pb-4" style={{ backgroundColor: '#001233', borderTop: '1px solid rgba(1, 74, 173, 0.2)' }}>
       <div className="container">
         {/* Top Section */}
         <div className="row gy-5 mb-5">
