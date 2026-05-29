@@ -95,7 +95,7 @@ export default function CreateUserPage() {
     companyName: '', tenantType: 'Individual', gstPan: '',
     floorAssignmentStartDate: '', floorAssignmentEndDate: '',
     monthlyManagementAmount: 0, paymentType: 'Monthly', paymentDueDay: 5,
-    agreementStatus: 'Active', remarks: ''
+    agreementStatus: 'Active', remarks: '', staffCategory: 'None'
   });
   
   const [properties, setProperties] = useState<any[]>([]);
@@ -144,6 +144,23 @@ export default function CreateUserPage() {
             updated.paymentDueDay = dayNum;
           }
         }
+
+        // Auto-calculate end date based on role:
+        // Floor Admin: 1 Year (12 months)
+        // Office Owner: 3 Years (36 months)
+        // Default: 1 Year (12 months)
+        const startDate = new Date(val);
+        if (!isNaN(startDate.getTime())) {
+          const yearsToAdd = prev.role === 'Office Owner' ? 3 : 1;
+          const endDate = new Date(startDate);
+          endDate.setFullYear(startDate.getFullYear() + yearsToAdd);
+          endDate.setDate(endDate.getDate() - 1);
+          
+          const yyyy = endDate.getFullYear();
+          const mm = String(endDate.getMonth() + 1).padStart(2, '0');
+          const dd = String(endDate.getDate()).padStart(2, '0');
+          updated.floorAssignmentEndDate = `${yyyy}-${mm}-${dd}`;
+        }
       }
       return updated;
     });
@@ -154,6 +171,28 @@ export default function CreateUserPage() {
     fetchFloors();
     fetchUnits();
   }, []);
+
+  // Auto-calculate end date if role changes and start date is present
+  useEffect(() => {
+    if (formData.floorAssignmentStartDate) {
+      const startDate = new Date(formData.floorAssignmentStartDate);
+      if (!isNaN(startDate.getTime())) {
+        const yearsToAdd = formData.role === 'Office Owner' ? 3 : 1;
+        const endDate = new Date(startDate);
+        endDate.setFullYear(startDate.getFullYear() + yearsToAdd);
+        endDate.setDate(endDate.getDate() - 1);
+        
+        const yyyy = endDate.getFullYear();
+        const mm = String(endDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(endDate.getDate()).padStart(2, '0');
+        
+        setFormData(prev => ({
+          ...prev,
+          floorAssignmentEndDate: `${yyyy}-${mm}-${dd}`
+        }));
+      }
+    }
+  }, [formData.role, formData.floorAssignmentStartDate]);
 
   // Auto-map permissions based on selected Role
   useEffect(() => {
@@ -254,7 +293,7 @@ export default function CreateUserPage() {
       };
       await api.post('/users', payload);
       setDialog({
-        title: "Account Provisioned",
+        title: "User Registered",
         message: `${formData.name} was successfully registered and spatial privileges were set.`,
         type: "success"
       });
@@ -305,6 +344,27 @@ export default function CreateUserPage() {
 
   const totalMonthlyAmount = formData.monthlyManagementAmount || 0;
 
+  const getTermMonths = () => {
+    if (!formData.floorAssignmentStartDate || !formData.floorAssignmentEndDate) return 12;
+    const start = new Date(formData.floorAssignmentStartDate);
+    const end = new Date(formData.floorAssignmentEndDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 12;
+    const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+    return Math.max(diffMonths, 1);
+  };
+
+  const termMonths = getTermMonths();
+  const monthlyRate = formData.monthlyManagementAmount || 0;
+  
+  let cyclePayment = monthlyRate;
+  if (formData.paymentType === 'Quarterly') {
+    cyclePayment = monthlyRate * 3;
+  } else if (formData.paymentType === 'Yearly') {
+    cyclePayment = monthlyRate * 12;
+  }
+  
+  const totalTermAmount = monthlyRate * termMonths;
+
   const remainingAvailableFloors = floors.filter(f => {
     if (!f.property) return false;
     const propId = typeof f.property === 'object' ? f.property._id : f.property;
@@ -338,7 +398,7 @@ export default function CreateUserPage() {
               <i className="bi bi-arrow-left text-dark" style={{ fontSize: '1.1rem' }}></i>
             </Link>
             <div>
-              <h4 className="fw-bold mb-0 text-dark" style={{ letterSpacing: '-0.5px' }}>Provision New Staff</h4>
+              <h4 className="fw-bold mb-0 text-dark" style={{ letterSpacing: '-0.5px' }}>Create New User</h4>
               <p className="text-muted mb-0 small" style={{ fontSize: '0.8rem' }}>Create a secure account and assign hierarchical access.</p>
             </div>
           </div>
@@ -381,7 +441,16 @@ export default function CreateUserPage() {
                     </div>
                     <div className="col-md-6">
                       <label className="form-label small fw-bold text-dark mb-1">Primary Role *</label>
-                      <select className="form-select py-2 shadow-none fw-medium text-dark" required value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})} style={{ borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                      <select className="form-select py-2 shadow-none fw-medium text-dark" required value={formData.role} 
+                        onChange={(e) => {
+                          const r = e.target.value;
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            role: r, 
+                            staffCategory: r === 'Staff Admin' ? 'Security' : 'None' 
+                          }));
+                        }} 
+                        style={{ borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
                         {currentUser?.role === 'Floor Admin' ? (
                           <option value="Office Owner">Office Owner</option>
                         ) : (
@@ -394,6 +463,24 @@ export default function CreateUserPage() {
                         )}
                       </select>
                     </div>
+                    {formData.role === 'Staff Admin' && (
+                      <div className="col-md-6 animate-fadeIn">
+                        <label className="form-label small fw-bold text-dark mb-1">Staff Category *</label>
+                        <select className="form-select py-2 shadow-none fw-medium text-dark" required value={formData.staffCategory} 
+                          onChange={(e) => setFormData({...formData, staffCategory: e.target.value})} 
+                          style={{ borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                          <option value="Security">Security / Guard</option>
+                          <option value="Watchman">Watchman / Caretaker</option>
+                          <option value="Electrician">Electrician</option>
+                          <option value="Plumber">Plumber</option>
+                          <option value="Helpdesk">Helpdesk Executive</option>
+                          <option value="Gardener">Gardener</option>
+                          <option value="Housekeeping">Housekeeping / Cleaner</option>
+                          <option value="Supervisor">Supervisor</option>
+                          <option value="Other">Other Staff</option>
+                        </select>
+                      </div>
+                    )}
                     <div className="col-md-6">
                       <label className="form-label small fw-bold text-dark mb-1">Temporary Password *</label>
                       <div className="position-relative">
@@ -612,7 +699,7 @@ export default function CreateUserPage() {
                   {isLoading ? (
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                   ) : null}
-                  Provision Staff Account
+                  Create User Account
                 </button>
               </div>
 
@@ -668,14 +755,34 @@ export default function CreateUserPage() {
                       </div>
                     </div>
 
-                    <div className="p-3 bg-emerald bg-opacity-10 border border-emerald rounded-3 d-flex justify-content-between align-items-center" style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}>
-                      <div>
-                        <span className="text-dark small fw-bold d-block">Monthly Management Dues</span>
-                        <span className="small text-muted">{formData.paymentType} billing cycle</span>
+                     <div className="p-3 bg-white border rounded-3 d-flex flex-column gap-2">
+                      <span className="text-muted small fw-bold text-uppercase">Payment & Billing Breakdown</span>
+                      
+                      <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                        <span className="text-muted small">Billing Cycle</span>
+                        <span className="fw-bold text-dark small">{formData.paymentType}</span>
                       </div>
-                      <div className="text-end">
-                        <span className="fs-4 fw-bold" style={{ color: '#014aad' }}>₹{totalMonthlyAmount.toLocaleString()}</span>
-                        <span className="text-muted small d-block">INR</span>
+
+                      <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                        <span className="text-muted small">Monthly Rate</span>
+                        <span className="fw-bold text-dark small">₹{monthlyRate.toLocaleString()} / mo</span>
+                      </div>
+
+                      <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                        <span className="text-muted small">Pay per Cycle ({formData.paymentType})</span>
+                        <span className="fw-bold text-primary small">₹{cyclePayment.toLocaleString()}</span>
+                      </div>
+
+                      <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                        <span className="text-muted small">Total Term Value ({termMonths} mos)</span>
+                        <span className="fw-bold text-success small">₹{totalTermAmount.toLocaleString()}</span>
+                      </div>
+
+                      <div className="p-2 bg-light rounded mt-1 border border-light-subtle">
+                        <div className="text-muted" style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
+                          <i className="bi bi-calendar-event-fill text-primary me-1"></i>
+                          Due Date: Payments must be paid on or before the <strong className="text-dark">{formData.paymentDueDay || 5}th</strong> day of each billing period.
+                        </div>
                       </div>
                     </div>
 

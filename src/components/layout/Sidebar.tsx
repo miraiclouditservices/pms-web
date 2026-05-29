@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "@/styles/modules/Sidebar.module.css";
-import LogoutModal from "@/components/dashboard/LogoutModal";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
 
   useEffect(() => {
@@ -24,14 +22,6 @@ export default function Sidebar() {
     }
   }, []);
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-    }
-    console.log("Logging out...");
-    window.location.href = "/login";
-  };
 
   const displayName = user ? user.name : "Admin User";
   const displayRole = user 
@@ -39,7 +29,7 @@ export default function Sidebar() {
     : "Super Admin";
   const avatarChar = displayName ? displayName.charAt(0).toUpperCase() : "A";
 
-  const isSuperAdmin = user?.role === "Super Admin";
+  const isSuperAdmin = user?.role === "Super Admin" || user?.role === "Admin";
   const permissions = (user as any)?.permissions || [];
 
   const hasAccess = (permission: string) => isSuperAdmin || permissions.includes(permission);
@@ -51,12 +41,12 @@ export default function Sidebar() {
         ...(isSuperAdmin || permissions.length > 0 ? [{ name: "Dashboard", path: "/admin/dashboard", icon: "bi-grid-1x2-fill" }] : []),
         ...(hasAccess('view_properties') ? [{ name: "Properties", path: "/admin/properties", icon: "bi-building-fill" }] : []),
         ...(hasAccess('view_floors') ? [{ name: "Floors", path: "/admin/floors", icon: "bi-layers-fill" }] : []),
-        ...(hasAccess('view_floors') ? [{ name: "Units / Flats", path: "/admin/units", icon: "bi-door-open-fill" }] : []),
+        ...(hasAccess('view_floors') ? [{ name: "Units and sft", path: "/admin/units", icon: "bi-door-open-fill" }] : []),
         ...(hasAccess('view_tenants') ? [{ name: "Leases", path: "/admin/leases", icon: "bi-file-earmark-text-fill" }] : []),
         ...(hasAccess('view_finance') ? [
             { name: "Finance / Billing", path: "/admin/finance", icon: "bi-receipt" }
         ] : []),
-        ...(user?.role === 'Super Admin' || user?.role === 'Floor Admin' || user?.role === 'Owner' || user?.role === 'Office Owner' ? [
+        ...(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Floor Admin' || user?.role === 'Owner' || user?.role === 'Office Owner' ? [
             { name: "Payments", path: "/admin/payments", icon: "bi-credit-card-fill" }
         ] : []),
       ]
@@ -71,6 +61,12 @@ export default function Sidebar() {
             { name: "Visitors", path: "/admin/visitors", icon: "bi-person-badge-fill" },
             { name: "Materials", path: "/admin/materials", icon: "bi-cart-fill" },
             { name: "Bookings", path: "/admin/bookings", icon: "bi-calendar-event-fill" }
+        ] : []),
+        ...(isSuperAdmin || user?.role === 'Staff Admin' || user?.role === 'Floor Admin' ? [
+            { name: "Assets", path: "/admin/assets", icon: "bi-tools" }
+        ] : []),
+        ...(isSuperAdmin || user?.role === 'Staff Admin' ? [
+            { name: "Vendors", path: "/admin/vendors", icon: "bi-truck" }
         ] : [])
       ]
     },
@@ -78,10 +74,13 @@ export default function Sidebar() {
       label: "Management",
       items: [
         ...(hasAccess('manage_staff') ? [
-          { name: "Staff Management", path: "/admin/users", icon: "bi-person-badge" },
+          { name: "Access Management", path: "/admin/users", icon: "bi-person-badge" },
         ] : []),
         ...(hasAccess('view_analytics') ? [
             { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "bi-pie-chart-fill" }
+        ] : []),
+        ...(isSuperAdmin || user?.role === 'Staff Admin' ? [
+            { name: "Reports", path: "/admin/reports", icon: "bi-file-earmark-bar-graph-fill" }
         ] : [])
       ]
     },
@@ -93,7 +92,7 @@ export default function Sidebar() {
     }
   ].map(group => {
     if (user?.role === "Owner" || user?.role === "Office Owner") {
-      const itemsToRemove = ["Properties", "Floors", "Units / Flats", "Tenants", "Leases", "Owners", "Assets", "Vendors"];
+      const itemsToRemove = ["Properties", "Floors", "Units and sft", "Tenants", "Leases", "Owners", "Assets", "Vendors", "Reports"];
       return {
         ...group,
         items: group.items.filter(item => !itemsToRemove.includes(item.name))
@@ -137,28 +136,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User Profile */}
-      <div className={styles.userProfile}>
-        <div className={styles.userCard}>
-          <div className={styles.avatar}>{avatarChar}</div>
-          <div className={styles.userInfo}>
-            <p className={styles.userName}>{displayName}</p>
-            <p className={styles.userRole}>{displayRole}</p>
-          </div>
-          <button 
-            className="btn btn-link text-muted p-0 shadow-none"
-            onClick={() => setIsLogoutModalOpen(true)}
-          >
-            <i className="bi bi-box-arrow-right"></i>
-          </button>
-        </div>
-      </div>
-
-      <LogoutModal 
-        isOpen={isLogoutModalOpen} 
-        onClose={() => setIsLogoutModalOpen(false)} 
-        onConfirm={handleLogout} 
-      />
     </aside>
   );
 }

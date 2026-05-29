@@ -60,7 +60,7 @@ export default function LoginPage() {
       {/* Brand Side (Visible on Desktop) */}
       <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-between p-5 position-relative overflow-hidden" 
            style={{ 
-             background: 'linear-gradient(135deg, #002855 0%, #014aad 100%)',
+             background: 'linear-gradient(135deg, #090f26 0%, #014aad 100%)',
              color: 'white'
            }}>
         {/* Animated Background Mesh */}
@@ -70,44 +70,71 @@ export default function LoginPage() {
         }}></div>
 
         <div className="position-relative z-1">
-          <div className="d-flex align-items-center gap-3 mb-5">
+          <div className="d-flex align-items-center gap-3 mb-4">
             <div className="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center shadow-lg" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-shield-check fs-4"></i>
+              <i className="bi bi-clouds-fill fs-4"></i>
             </div>
-            <span className="fw-bold fs-4 tracking-tight">PMS GLOBAL</span>
+            <span className="fw-bold fs-4 tracking-tight">MIRAI CLOUD</span>
           </div>
 
           <div className="mt-5 pt-4">
-            <h1 className="display-4 fw-bold mb-3" style={{ letterSpacing: '-0.04em', lineHeight: '1.2' }}>
-              Enterprise <br />
-              <span className="text-white text-opacity-75">Property Management.</span>
-            </h1>
-            <p className="fw-light text-white text-opacity-80" style={{ maxWidth: '440px', fontSize: '1.1rem' }}>
-              The unified command center for global real estate assets, security protocols, and high-density space modeling.
+            <p className="fw-light text-white text-opacity-75" style={{ maxWidth: '500px', fontSize: '0.95rem', lineHeight: '1.6' }}>
+              Mirai Cloud is a next-generation property and tenant management platform designed for global enterprises.
+              Unify your real estate operations, automate workflows, and gain real-time visibility across all locations.
             </p>
           </div>
         </div>
 
-        <div className="position-relative z-1 d-flex justify-content-between align-items-center small text-white text-opacity-40 fw-bold text-uppercase" style={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
-          <div>v4.2.0 Build</div>
-          <div>© 2026 PSM GLOBAL</div>
+        {/* Stats Section & Footer */}
+        <div className="position-relative z-1">
+          <div className="row g-3 mb-4">
+            <div className="col-6">
+              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-building me-1"></i> Properties Managed</div>
+                <div className="fs-5 fw-bold text-white">5000+</div>
+              </div>
+            </div>
+            <div className="col-6">
+              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-people me-1"></i> Active Tenants</div>
+                <div className="fs-5 fw-bold text-white">25K+</div>
+              </div>
+            </div>
+            <div className="col-6">
+              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-cash-coin me-1"></i> Rental Value</div>
+                <div className="fs-5 fw-bold text-white">$1.2B+</div>
+              </div>
+            </div>
+            <div className="col-6">
+              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-cpu me-1"></i> System Uptime</div>
+                <div className="fs-5 fw-bold text-white">99.99%</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="d-flex justify-content-between align-items-center small text-white text-opacity-40 fw-bold text-uppercase" style={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
+            <div>v5.0.0 Build</div>
+            <div>© 2026 MIRAI CLOUD</div>
+          </div>
         </div>
       </div>
 
       {/* Login Form Side */}
       <div className="col-lg-6 d-flex flex-column justify-content-center align-items-center p-4 p-md-5">
-        <div className="w-100" style={{ maxWidth: '360px' }}>
+        <div className="w-100" style={{ maxWidth: '380px', padding: '20px 0' }}>
           {/* Mobile Header */}
           <div className="d-lg-none text-center mb-4">
             <div className="bg-emerald text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2 shadow-sm" style={{ width: '56px', height: '56px' }}>
-              <i className="bi bi-shield-check fs-3"></i>
+              <i className="bi bi-clouds-fill fs-3"></i>
             </div>
-            <h4 className="fw-bold mb-1">PMS GLOBAL</h4>
+            <h4 className="fw-bold mb-1">MIRAI CLOUD</h4>
           </div>
 
           <div className="mb-4">
-            <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Welcome Back</h3>
-            <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>Access your global property portfolio dashboard.</p>
+            <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Welcome to Mirai Cloud</h3>
+            <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>Sign in to manage global properties, automation, and billing.</p>
           </div>
 
           <form onSubmit={handleLogin}>

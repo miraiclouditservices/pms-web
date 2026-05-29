@@ -6,9 +6,17 @@ import React from "react";
 export function StatCard({ label, value, icon, color, sub, trend }: any) {
   return (
     <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"16px 18px",
-      display:"flex",alignItems:"center",gap:14,boxShadow:"0 1px 6px rgba(0,0,0,0.06)",transition:"transform 0.15s",cursor:"default" }}
-      onMouseEnter={e=>(e.currentTarget.style.transform="translateY(-2px)")}
-      onMouseLeave={e=>(e.currentTarget.style.transform="none")}>
+      display:"flex",alignItems:"center",gap:14,boxShadow:"0 1px 6px rgba(0,0,0,0.06)",transition:"all 0.2s ease-in-out",cursor:"default" }}
+      onMouseEnter={e=>{
+        e.currentTarget.style.transform="translateY(-2px)";
+        e.currentTarget.style.borderColor="#014aad";
+        e.currentTarget.style.boxShadow="0 8px 24px rgba(1, 74, 173, 0.12)";
+      }}
+      onMouseLeave={e=>{
+        e.currentTarget.style.transform="none";
+        e.currentTarget.style.borderColor="#e2e8f0";
+        e.currentTarget.style.boxShadow="0 1px 6px rgba(0,0,0,0.06)";
+      }}>
       <div style={{ width:44,height:44,borderRadius:10,background:color+"1a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
         <i className={`bi ${icon}`} style={{ color,fontSize:"1.2rem" }} />
       </div>

@@ -4,6 +4,7 @@ import { api } from "@/utils/api";
 
 export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
   const [properties, setProperties] = useState<any[]>([]);
+  const [existingFloors, setExistingFloors] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     property: "",
@@ -33,11 +34,30 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
     }
   }, [editData, isOpen]);
 
+  useEffect(() => {
+    if (isOpen && formData.property) {
+      fetchPropertyFloors(formData.property);
+    } else {
+      setExistingFloors([]);
+    }
+  }, [formData.property, isOpen]);
+
   const fetchProperties = async () => {
     try {
       const response = await api.get('/properties');
       if (response.success) setProperties(response.data);
     } catch (err) { console.error(err); }
+  };
+
+  const fetchPropertyFloors = async (propertyId: string) => {
+    try {
+      const response = await api.get(`/floors?property=${propertyId}&limit=100`);
+      if (response.success && response.data) {
+        setExistingFloors(response.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleChange = (e: any) => {
@@ -48,23 +68,20 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
   const selectedProperty = properties.find(p => p._id === formData.property);
   const floorSft = Number(formData.totalSft) || 0;
   
-  // Available SFT needs to account for the current floor's SFT if we are editing
-  const baseAvailableSft = selectedProperty?.availableSft || 0;
-  const originalFloorSft = editData ? (editData.totalSft || 0) : 0;
+  // Sum up capacity (totalSft) of all other floors for this property
+  const otherFloorsSft = existingFloors
+    .filter(f => !editData || f._id !== editData._id)
+    .reduce((sum, f) => sum + (f.totalSft || 0), 0);
   
-  // If we are editing, the actual available SFT includes the SFT currently assigned to this floor
-  const trueAvailablePropertySft = (editData && formData.property === (editData.property?._id || editData.property)) 
-    ? baseAvailableSft + originalFloorSft 
-    : baseAvailableSft;
+  // Available SFT is the property's total SFT minus capacity allocated to other floors
+  const trueAvailablePropertySft = selectedProperty 
+    ? Math.max(0, (selectedProperty.totalSft || 0) - otherFloorsSft)
+    : 0;
     
   const remainingSft = trueAvailablePropertySft - floorSft;
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
-    if (selectedProperty && floorSft > trueAvailablePropertySft) {
-      alert(`Floor SFT (${floorSft}) cannot exceed Available Property SFT (${trueAvailablePropertySft}).`);
-      return;
-    }
     onSave(formData);
   };
 
@@ -111,12 +128,12 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
                       <div className="fw-bold fs-5 text-dark">{selectedProperty.totalSft?.toLocaleString() || 0}</div>
                     </div>
                     <div className="flex-fill border-start ps-3">
-                      <div className="text-muted small fw-bold">Occupied SFT</div>
-                      <div className="fw-bold fs-5 text-warning">{selectedProperty.occupiedSft?.toLocaleString() || 0}</div>
+                      <div className="text-muted small fw-bold">Floor-Allocated SFT</div>
+                      <div className="fw-bold fs-5 text-warning">{(otherFloorsSft + floorSft).toLocaleString()}</div>
                     </div>
                     <div className="flex-fill border-start ps-3">
                       <div className="text-muted small fw-bold">Available SFT</div>
-                      <div className="fw-bold fs-5 text-success">{trueAvailablePropertySft.toLocaleString()}</div>
+                      <div className="fw-bold fs-5 text-success">{(remainingSft < 0 ? 0 : remainingSft).toLocaleString()}</div>
                     </div>
                   </div>
                 )}
@@ -136,21 +153,21 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
                   </div>
                   
                   <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted">Floor SFT <span className="text-danger">*</span></label>
+                    <label className="form-label fw-bold small text-muted">Capacity (SFT) <span className="text-danger">*</span></label>
                     <div className="input-group shadow-sm">
                       <input 
                         type="number" 
-                        className={`form-control border-light-subtle ${floorSft > trueAvailablePropertySft ? 'is-invalid' : ''}`} 
+                        className="form-control border-light-subtle" 
                         name="totalSft" 
                         value={formData.totalSft} 
                         onChange={handleChange} 
-                        placeholder="Enter Floor Area in SFT" 
+                        placeholder="Enter Floor Capacity in SFT" 
                         min="0"
                         required 
                       />
                       <span className="input-group-text bg-light text-muted">SFT</span>
                     </div>
-                    {floorSft > trueAvailablePropertySft && (
+                    {floorSft > 0 && floorSft > trueAvailablePropertySft && (
                       <div className="text-danger small mt-1 fw-bold">
                         <i className="bi bi-exclamation-triangle-fill me-1"></i>
                         Exceeds available property space!
@@ -189,7 +206,6 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
                   type="submit" 
                   className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2" 
                   style={{ backgroundColor: '#014aad', borderColor: '#014aad' }}
-                  disabled={floorSft > trueAvailablePropertySft}
                 >
                   <i className={editData ? "bi bi-check-circle" : "bi bi-plus-circle"}></i> 
                   {editData ? 'Update Floor' : 'Create Floor'}

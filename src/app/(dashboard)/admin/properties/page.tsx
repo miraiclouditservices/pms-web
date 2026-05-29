@@ -266,12 +266,12 @@ function PropertiesContent() {
               <thead>
                 <tr className="border-0">
                   <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopLeftRadius: '8px' }}>S No</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property Name</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Type</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Added By</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Structure</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Total Units</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Occupancy</th>
+                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Building/Block</th>
+                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property Type</th>
+                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Addedby</th>
+                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property details</th>
+                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Total Sft</th>
+                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Occupied Sft</th>
                   <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Status</th>
                   <th className="py-3 px-4 fw-bold text-center" style={{ position: 'sticky', top: '70px', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopRightRadius: '8px' }}>Action</th>
                 </tr>
@@ -296,10 +296,10 @@ function PropertiesContent() {
                         {prop.totalFloors || 0} Floors
                       </td>
                       <td className="py-3 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
-                        {prop.totalUnits || 0}
+                        {prop.totalSft ? prop.totalSft.toLocaleString() : 0} SFT
                       </td>
                       <td className="py-3 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
-                        {prop.occupancy || 0}%
+                        {prop.occupiedSft ? prop.occupiedSft.toLocaleString() : 0} SFT
                       </td>
                       <td className="py-3 px-4 align-middle" style={{ border: 'none' }}>
                         <span style={{

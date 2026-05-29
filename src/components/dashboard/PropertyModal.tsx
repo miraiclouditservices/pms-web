@@ -29,7 +29,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
   });
 
   const [towers, setTowers] = useState<TowerConfig[]>([
-    { id: '1', name: 'Tower A', floors: 10, sft: 10000 }
+    { id: '1', name: 'Tower A', floors: 0, sft: 10000 }
   ]);
 
   useEffect(() => {
@@ -44,8 +44,8 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
           closingTime: editData.closingTime || "18:00"
         });
         setTowers(editData.towerConfigs && editData.towerConfigs.length > 0 
-          ? editData.towerConfigs 
-          : [{ id: '1', name: 'Tower A', floors: editData.totalFloors || 10, sft: editData.totalSft || 10000 }]);
+          ? editData.towerConfigs.map((t: any) => ({ ...t, floors: t.floors || 0 }))
+          : [{ id: '1', name: 'Tower A', floors: 0, sft: editData.totalSft || 10000 }]);
       } else {
         setFormData({
           propertyName: "",
@@ -55,7 +55,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
           openingTime: "09:00",
           closingTime: "18:00"
         });
-        setTowers([{ id: '1', name: 'Tower A', floors: 10, sft: 10000 }]);
+        setTowers([{ id: '1', name: 'Tower A', floors: 0, sft: 10000 }]);
       }
     }
   }, [editData, isOpen]);
@@ -66,7 +66,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
 
   const handleAddTower = () => {
     const nextChar = String.fromCharCode(65 + towers.length);
-    setTowers([...towers, { id: Date.now().toString(), name: `Tower ${nextChar}`, floors: 10, sft: 10000 }]);
+    setTowers([...towers, { id: Date.now().toString(), name: `Tower ${nextChar}`, floors: 0, sft: 10000 }]);
   };
 
   const handleRemoveTower = (id: string) => {
@@ -209,7 +209,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
                       <div key={tower.id} className="col-md-6 tower-row">
                         <div className="bg-white p-3 rounded-lg border shadow-sm position-relative transition-all" style={{ transition: 'all 0.3s' }}>
                           <div className="row g-2 align-items-center">
-                            <div className="col-5">
+                            <div className="col-7">
                               <label className="x-small fw-bold text-muted text-uppercase mb-1" style={{ fontSize: '0.6rem' }}>Tower Name</label>
                               <input 
                                 type="text" className="form-control form-control-sm border bg-white fw-bold"
@@ -217,15 +217,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, editData }: Pro
                                 style={{ fontSize: '0.8rem' }}
                               />
                             </div>
-                            <div className="col-3">
-                              <label className="x-small fw-bold text-muted text-uppercase mb-1" style={{ fontSize: '0.6rem' }}>Floors</label>
-                              <input 
-                                type="number" className="form-control form-control-sm border bg-white fw-bold"
-                                value={tower.floors} onChange={(e) => updateTower(tower.id, 'floors', parseInt(e.target.value) || 0)}
-                                style={{ fontSize: '0.8rem' }}
-                              />
-                            </div>
-                            <div className="col-4">
+                            <div className="col-5">
                               <label className="x-small fw-bold text-muted text-uppercase mb-1" style={{ fontSize: '0.6rem' }}>SFT</label>
                               <input 
                                 type="number" className="form-control form-control-sm border bg-white fw-bold"

@@ -115,7 +115,8 @@ export default function UsersPage() {
     if (!unitIds || unitIds.length === 0) return 'None';
     return unitIds.map(id => {
       const found = units.find(u => u._id === id);
-      return found ? `Unit ${found.unitNumber}` : 'Unknown Unit';
+      if (!found) return 'Unknown Unit';
+      return found.unitName ? `${found.unitName} (Unit ${found.unitNumber})` : `Unit ${found.unitNumber}`;
     }).join(', ');
   };
 
@@ -178,7 +179,7 @@ export default function UsersPage() {
         <div className="d-flex justify-content-between align-items-center mb-3 pb-2 pt-0 flex-shrink-0" style={{ backgroundColor: '#ffffff' }}>
           <div className="d-flex gap-4">
             <div style={{ paddingBottom: '8px', cursor: 'pointer', marginBottom: '-1px' }}>
-              <span className="fw-bold text-dark" style={{ fontSize: '1rem' }}>Staff & Spatial Access Management</span>
+              <span className="fw-bold text-dark" style={{ fontSize: '1rem' }}>Access Management</span>
             </div>
           </div>
 
@@ -220,7 +221,7 @@ export default function UsersPage() {
               className="btn d-flex align-items-center justify-content-center gap-2 shadow-sm px-4"
               style={{ backgroundColor: "#014aad", color: '#ffffff', fontWeight: '500', borderRadius: '4px', height: '40px', fontSize: '0.85rem', border: 'none' }}
             >
-              <i className="bi bi-person-plus-fill"></i> Provision User
+              <i className="bi bi-person-plus-fill"></i> new user
             </Link>
           </div>
         </div>
@@ -231,10 +232,10 @@ export default function UsersPage() {
             <thead>
               <tr className="border-0">
                 <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopLeftRadius: '8px' }}>S No</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>PERSONNEL</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>ACCESS LEVEL (ROLE)</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>PROVISIONED DATE</th>
-                <th className="py-3 px-4 fw-bold text-center" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopRightRadius: '8px' }}>ACTIONS</th>
+                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>User Name</th>
+                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Access type</th>
+                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Creation date</th>
+                <th className="py-3 px-4 fw-bold text-center" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopRightRadius: '8px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -256,9 +257,16 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                    <span className={`badge rounded-pill px-3 py-1 border ${getRoleBadge(user.role)}`} style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                      {user.role}
-                    </span>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className={`badge rounded-pill px-3 py-1 border ${getRoleBadge(user.role)}`} style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                        {user.role}
+                      </span>
+                      {user.role === 'Staff Admin' && user.staffCategory && user.staffCategory !== 'None' && (
+                        <span className="badge rounded-pill px-2 py-1 bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style={{ fontSize: '0.7rem' }}>
+                          <i className="bi bi-tag-fill me-1"></i>{user.staffCategory}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
                     <span className="text-dark fw-bold" style={{ fontSize: '0.85rem' }}>
@@ -365,6 +373,14 @@ export default function UsersPage() {
                       <span className="text-muted small d-block">GSTIN / PAN Code</span>
                       <strong className="text-dark small">{viewUser.gstPan || 'N/A'}</strong>
                     </div>
+                    {viewUser.role === 'Staff Admin' && viewUser.staffCategory && viewUser.staffCategory !== 'None' && (
+                      <div className="col-md-4 animate-fadeIn">
+                        <span className="text-muted small d-block">Staff Category</span>
+                        <strong className="text-primary small d-flex align-items-center gap-1">
+                          <i className="bi bi-patch-check-fill text-success"></i> {viewUser.staffCategory}
+                        </strong>
+                      </div>
+                    )}
                     <div className="col-12 border-top pt-2">
                       <span className="text-muted small d-block">Residential Address</span>
                       <strong className="text-dark small">{viewUser.address || 'N/A'}</strong>

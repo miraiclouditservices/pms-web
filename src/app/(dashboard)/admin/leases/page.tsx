@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import Link from "next/link";
 import { api } from "@/utils/api";
 import LeaseModal from "@/components/dashboard/LeaseModal";
 
 function LeasesContent() {
-  const [activeTab, setActiveTab] = useState<"tenants" | "owners">("tenants");
+  const [activeTab, setActiveTab] = useState<"tenants" | "owners">("owners");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState<any>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "view">("create");
@@ -218,16 +217,22 @@ function LeasesContent() {
 
   const getSpatialAllocations = (u: any) => {
     const props = (u.assignedProperties || []).map((id: string) => {
-      const found = properties.find(p => p._id === id);
+      const found = properties.find((p: any) => (p._id || p) === id || p._id?.toString() === id?.toString());
       return found ? found.propertyName : '';
     }).filter(Boolean).join(', ');
 
     const flrs = (u.assignedFloors || []).map((id: string) => {
-      const found = floors.find(f => f._id === id);
+      const found = floors.find((f: any) => (f._id || f) === id || f._id?.toString() === id?.toString());
       return found ? (found.floorName || `Floor ${found.floorNumber}`) : '';
     }).filter(Boolean).join(', ');
 
-    return `${props || 'N/A'} - ${flrs || 'No Floor'}`;
+    const unitNums = (u.assignedUnits || []).map((id: string) => {
+      const found = units.find((un: any) => (un._id || un) === id || un._id?.toString() === id?.toString());
+      return found ? `Unit ${found.unitNumber}` : '';
+    }).filter(Boolean).join(', ');
+
+    const spatial = [props, flrs].filter(Boolean).join(' - ') || 'N/A';
+    return unitNums ? `${spatial} • ${unitNums}` : spatial;
   };
 
   const getUserProperties = (u: any) => {
@@ -264,6 +269,14 @@ function LeasesContent() {
     return matchesSearch && matchesStatus;
   });
 
+  // Client-side pagination for Office Owner & Admin Agreements
+  const itemsPerPage = 10;
+  const totalOwnerPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="container-fluid p-0" style={{ fontFamily: 'var(--font-geist-sans)' }}>
       <style jsx global>{`
@@ -272,239 +285,103 @@ function LeasesContent() {
         .bg-purple { background-color: #8b5cf6 !important; }
         .bg-purple-light { background-color: rgba(139, 92, 246, 0.1) !important; }
         
-        .tab-btn {
-          border: none;
-          background: transparent;
-          font-weight: 600;
-          color: #64748b;
-          padding: 8px 16px;
-          border-bottom: 2px solid transparent;
-          transition: all 0.2s ease;
+        .table-responsive::-webkit-scrollbar {
+          height: 6px;
+          display: block !important;
         }
-        .tab-btn.active {
-          color: #014aad;
-          border-bottom-color: #014aad;
+        .table-responsive::-webkit-scrollbar-track {
+          background: #f8fafc;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
         }
       `}</style>
 
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      {/* Header with Title & Action / Filter Row */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
-          <h2 className="fw-bold mb-0 text-dark" style={{ letterSpacing: "-0.02em", fontSize: "1.5rem" }}>
-            Lease & Agreement Management
+          <h2 className="fw-bold mb-0 text-dark" style={{ letterSpacing: "-0.02em", fontSize: "1.35rem" }}>
+            Office Owner & Admin Agreements
           </h2>
-          <p className="text-muted small mb-0">Track active tenant leases, management contracts, and monthly collections.</p>
+        </div>
+        <div className="d-flex align-items-center gap-2 ms-md-auto">
+          <div className="bg-white border rounded px-3 d-flex align-items-center gap-2 shadow-sm" style={{ width: "260px", height: "36px" }}>
+            <i className="bi bi-search text-muted" style={{ fontSize: "0.85rem" }}></i>
+            <input
+              type="text"
+              className="border-0 bg-transparent w-100 shadow-none"
+              placeholder="Search owner name or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ outline: "none", fontSize: "0.85rem" }}
+            />
+          </div>
+          
+          <select
+            className="form-select border rounded fw-medium text-muted bg-white shadow-sm"
+            style={{ width: "150px", height: "36px", fontSize: "0.85rem" }}
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Pending">Pending</option>
+            <option value="Expired">Expired</option>
+            <option value="Suspended">Suspended</option>
+          </select>
         </div>
       </div>
 
-      {/* Segmented Tab Bar */}
-      <div className="d-flex border-bottom mb-4 bg-white rounded px-2 shadow-sm">
-        <button 
-          className={`tab-btn ${activeTab === 'tenants' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('tenants'); setSearch(""); setFilterStatus(""); }}
-        >
-          <i className="bi bi-people-fill me-2"></i>Tenant Leases
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'owners' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('owners'); setSearch(""); setFilterStatus(""); }}
-        >
-          <i className="bi bi-person-badge-fill me-2"></i>Office Owner & Admin Agreements
-        </button>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="d-flex justify-content-between align-items-center mb-3 gap-3">
-        <div className="bg-white border rounded px-3 d-flex align-items-center gap-2 flex-grow-1 shadow-sm" style={{ maxWidth: "340px", height: "36px" }}>
-          <i className="bi bi-search text-muted" style={{ fontSize: "0.85rem" }}></i>
-          <input
-            type="text"
-            className="border-0 bg-transparent w-100 shadow-none"
-            placeholder={activeTab === 'tenants' ? "Search tenant or contact..." : "Search owner name or email..."}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ outline: "none", fontSize: "0.85rem" }}
-          />
-        </div>
-        
-        <select
-          className="form-select border rounded fw-medium text-muted bg-white shadow-sm"
-          style={{ width: "180px", height: "36px", fontSize: "0.85rem" }}
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="">All Statuses</option>
-          <option value="Active">Active</option>
-          <option value="Pending">Pending</option>
-          <option value="Expired">Expired</option>
-          <option value="Suspended">Suspended</option>
-        </select>
-      </div>
-
-      {/* Table Card */}
       <div className="bg-white rounded border shadow-sm overflow-hidden">
-        <div className="table-responsive">
+        <div className="table-responsive w-100" style={{ overflowX: 'auto', display: 'block' }}>
           <table className="table mb-0 align-middle text-nowrap" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
             
             <thead>
               <tr>
-                {activeTab === "tenants" ? (
-                  ["S No", "Tenant Details", "Unit Portfolio", "Property Owner", "Rent Due", "Monthly Dues", "Duration", "Payment Status", "Status", "Actions"].map((col, i, arr) => (
-                    <th
-                      key={col}
-                      className="py-3 px-4 fw-bold text-start"
-                      style={{
-                        backgroundColor: "#3f3f3f",
-                        color: "#ffffff",
-                        fontSize: "0.78rem",
-                        border: "none",
-                      }}
-                    >
-                      {col}
-                    </th>
-                  ))
-                ) : (
-                  ["S No", "Personnel Details", "Role", "Spatial Mapping Area", "Monthly Dues", "Due Day", "Duration", "Payment Status", "Actions"].map((col, i, arr) => (
-                    <th
-                      key={col}
-                      className="py-3 px-4 fw-bold text-start"
-                      style={{
-                        backgroundColor: "#3f3f3f",
-                        color: "#ffffff",
-                        fontSize: "0.78rem",
-                        border: "none",
-                      }}
-                    >
-                      {col}
-                    </th>
-                  ))
-                )}
+                {["S No", "Personnel Details", "Role", "Spatial Mapping Area", "Monthly Dues", "Due Day", "Duration", "Payment Status", "Actions"].map((col) => (
+                  <th
+                    key={col}
+                    className="py-3 px-4 fw-bold text-start"
+                    style={{
+                      backgroundColor: "#3f3f3f",
+                      color: "#ffffff",
+                      fontSize: "0.78rem",
+                      border: "none",
+                    }}
+                  >
+                    {col}
+                  </th>
+                ))}
               </tr>
             </thead>
 
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-5">
+                  <td colSpan={9} className="text-center py-5">
                     <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
                     <div className="text-muted small mt-2">Loading active agreements...</div>
                   </td>
                 </tr>
-              ) : activeTab === "tenants" ? (
-                leases.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="text-center py-5 text-muted small">
-                      <i className="bi bi-file-earmark-x fs-2 d-block mb-2 text-muted opacity-50"></i>
-                      No active tenant lease agreements found.
-                    </td>
-                  </tr>
-                ) : leases.map((lease, index) => (
-                  <tr
-                    key={lease._id}
-                    style={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}
-                  >
-                    <td className="py-2 px-4 text-muted" style={{ border: "none", fontSize: "0.8rem" }}>
-                      {String(index + 1 + (currentPage - 1) * limit).padStart(3, "0")}
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <div className="fw-bold text-dark" style={{ fontSize: "0.85rem" }}>{lease.tenantName}</div>
-                      <div className="text-muted" style={{ fontSize: "0.7rem" }}>{lease.tenantContact}</div>
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      {lease.units && lease.units.length > 0 ? (
-                        <div className="d-flex flex-column gap-1">
-                          <div className="fw-bold text-dark small d-flex align-items-center gap-1">
-                            <i className="bi bi-door-open-fill text-primary" style={{ fontSize: "0.75rem" }}></i>
-                            {lease.units[0].unitNumber}
-                          </div>
-                          {lease.units.length > 1 && (
-                            <span className="badge bg-light text-muted border" style={{ fontSize: "0.6rem", width: "fit-content" }}>
-                              +{lease.units.length - 1} more
-                            </span>
-                          )}
-                          <div className="text-muted" style={{ fontSize: "0.65rem" }}>
-                            {lease.units[0].property?.propertyName || "Main Block"}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted small">Not Linked</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <div className="fw-bold text-dark" style={{ fontSize: "0.85rem" }}>{lease.owner?.ownerName || "N/A"}</div>
-                      <div className="text-muted" style={{ fontSize: "0.65rem" }}>Landlord</div>
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <span className="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2" style={{ fontSize: "0.7rem" }}>
-                        {lease.dueDay || 5}th of Month
-                      </span>
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <div className="fw-bold" style={{ fontSize: "0.85rem", color: "#014aad" }}>
-                        ₹{((lease.monthlyRent || 0) + (lease.maintenanceCharges || 0)).toLocaleString()}
-                      </div>
-                      <div className="text-muted" style={{ fontSize: "0.65rem" }}>
-                        Rent: ₹{lease.monthlyRent?.toLocaleString() || 0}
-                      </div>
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <div className="fw-medium text-dark" style={{ fontSize: "0.8rem" }}>{formatDate(lease.startDate)}</div>
-                      <div className="text-muted" style={{ fontSize: "0.65rem" }}>To {formatDate(lease.endDate)}</div>
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <button 
-                        className={`btn btn-sm rounded-pill fw-bold px-3 py-1 border transition-all ${
-                          lease.paymentStatus === "Paid" 
-                            ? "bg-success bg-opacity-10 text-success border-success" 
-                            : "bg-danger bg-opacity-10 text-danger border-danger"
-                        }`}
-                        style={{ fontSize: "0.7rem" }}
-                        onClick={() => handlePaymentToggle(lease._id, lease.paymentStatus)}
-                      >
-                        {lease.paymentStatus === "Paid" ? "Paid" : "Unpaid"}
-                      </button>
-                    </td>
-                    <td className="py-2 px-4" style={{ border: "none" }}>
-                      <span
-                        className={`badge rounded-pill px-3 py-1 fw-bold ${
-                          lease.status === "Active"
-                            ? "bg-success bg-opacity-10 text-success border border-success"
-                            : lease.status === "Terminated"
-                            ? "bg-danger bg-opacity-10 text-danger border border-danger"
-                            : "bg-warning bg-opacity-10 text-warning border border-warning"
-                        }`}
-                        style={{ fontSize: "0.65rem" }}
-                      >
-                        {lease.status || "Pending"}
-                      </span>
-                    </td>
-                    <td className="py-2 px-4 text-center" style={{ border: "none" }}>
-                      <div className="d-flex gap-2 justify-content-center">
-                        <button className="btn btn-link p-0 text-secondary" title="View Details" onClick={() => openViewModal(lease)}>
-                          <i className="bi bi-eye-fill" style={{ fontSize: "1.15rem", color: "#4b5563" }}></i>
-                        </button>
-                        <button className="btn btn-link p-0 text-primary" title="Edit Lease Terms" onClick={() => openEditModal(lease)}>
-                          <i className="bi bi-pencil-square" style={{ fontSize: "1.15rem", color: "#014aad" }}></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+              ) : paginatedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-5 text-muted small">
+                    <i className="bi bi-file-earmark-person fs-2 d-block mb-2 text-muted opacity-50"></i>
+                    No Floor Admin or Office Owner agreements found.
+                  </td>
+                </tr>
               ) : (
-                filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-5 text-muted small">
-                      <i className="bi bi-file-earmark-person fs-2 d-block mb-2 text-muted opacity-50"></i>
-                      No Floor Admin or Office Owner agreements found.
-                    </td>
-                  </tr>
-                ) : filteredUsers.map((u, index) => (
+                paginatedUsers.map((u, index) => (
                   <tr
                     key={u._id}
                     style={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}
                   >
                     <td className="py-2 px-4 text-muted" style={{ border: "none", fontSize: "0.8rem" }}>
-                      {String(index + 1).padStart(3, "0")}
+                      {String(index + 1 + (currentPage - 1) * itemsPerPage).padStart(3, "0")}
                     </td>
                     <td className="py-2 px-4" style={{ border: "none" }}>
                       <div className="fw-bold text-dark" style={{ fontSize: "0.85rem" }}>{u.name}</div>
@@ -568,9 +445,6 @@ function LeasesContent() {
                         >
                           <i className="bi bi-credit-card-2-front-fill" style={{ fontSize: "1.15rem", color: "#014aad" }}></i>
                         </button>
-                        <Link href="/admin/users" className="btn btn-link p-0 text-secondary" title="View Document Folder">
-                          <i className="bi bi-folder-fill" style={{ fontSize: "1.15rem", color: "#d97706" }}></i>
-                        </Link>
                       </div>
                     </td>
                   </tr>
@@ -581,32 +455,30 @@ function LeasesContent() {
           </table>
         </div>
 
-        {/* Pagination (Tenants only) */}
-        {activeTab === "tenants" && (
-          <div className="px-4 py-3 border-top d-flex justify-content-between align-items-center bg-white">
-            <span className="text-muted" style={{ fontSize: "0.85rem" }}>
-              Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
-            </span>
-            <div className="d-flex gap-2">
-              <button
-                className="btn border shadow-sm d-flex align-items-center gap-1 text-muted fw-medium"
-                style={{ fontSize: "0.85rem", borderRadius: "20px", padding: "4px 16px" }}
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              >
-                <i className="bi bi-chevron-left small"></i> Previous
-              </button>
-              <button
-                className="btn border shadow-sm d-flex align-items-center gap-1 text-muted fw-medium"
-                style={{ fontSize: "0.85rem", borderRadius: "20px", padding: "4px 16px" }}
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              >
-                Next <i className="bi bi-chevron-right small"></i>
-              </button>
-            </div>
+        {/* Pagination */}
+        <div className="px-4 py-3 border-top d-flex justify-content-between align-items-center bg-white">
+          <span className="text-muted" style={{ fontSize: "0.85rem" }}>
+            Page <strong>{currentPage}</strong> of <strong>{totalOwnerPages}</strong>
+          </span>
+          <div className="d-flex gap-2">
+            <button
+              className="btn border shadow-sm d-flex align-items-center gap-1 text-muted fw-medium"
+              style={{ fontSize: "0.85rem", borderRadius: "20px", padding: "4px 16px" }}
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              <i className="bi bi-chevron-left small"></i> Previous
+            </button>
+            <button
+              className="btn border shadow-sm d-flex align-items-center gap-1 text-muted fw-medium"
+              style={{ fontSize: "0.85rem", borderRadius: "20px", padding: "4px 16px" }}
+              disabled={currentPage === totalOwnerPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalOwnerPages, prev + 1))}
+            >
+              Next <i className="bi bi-chevron-right small"></i>
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
       <LeaseModal

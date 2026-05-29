@@ -25,6 +25,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchProfile();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "security" || tab === "profile" || tab === "spaces" || tab === "ownerProfile" || tab === "leases") {
+        setActiveTab(tab as any);
+      }
+    }
   }, []);
 
   const fetchProfile = async () => {

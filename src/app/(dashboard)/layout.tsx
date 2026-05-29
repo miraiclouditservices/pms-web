@@ -18,7 +18,7 @@ export default function DashboardLayout({
       {!hideSidebar && <Sidebar />}
       
       {/* Main Content Area */}
-      <div className="flex-grow-1" style={{ marginLeft: hideSidebar ? '0px' : '220px', transition: 'margin-left 0.3s ease' }}>
+      <div className="flex-grow-1" style={{ marginLeft: hideSidebar ? '0px' : '220px', transition: 'margin-left 0.3s ease', minWidth: 0 }}>
         {!hideSidebar && <Header />}
         <main className={hideSidebar ? "p-0" : "p-4"}>
           {children}

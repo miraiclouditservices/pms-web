@@ -194,30 +194,42 @@ export default function AssetsPage() {
       </div>
 
       {/* ── Metric Cards ────────────────────────────────────────────────────── */}
-      <div className="row g-3 mb-4">
+      <div className="row g-2 mb-4">
         {[
-          { label: "Total Assets",      sub: "Registered Assets",   value: metrics.total,                icon: "bi-box-seam",           color: "#014aad" },
-          { label: "AMC Active",        sub: "Currently Active",    value: metrics.amcActive,            icon: "bi-shield-check",       color: "#16a34a" },
-          { label: "AMC Expiring Soon", sub: "Expiring in 10 days", value: metrics.amcExpiringSoon,      icon: "bi-clock-history",      color: "#eab308" },
-          { label: "AMC Expired",       sub: "Needs Renewal",       value: metrics.amcExpired,           icon: "bi-shield-x",           color: "#dc2626" },
-          { label: "Warranty Expiring", sub: "Expiring in 10 days", value: metrics.warrantyExpiringSoon, icon: "bi-exclamation-circle", color: "#f97316" },
-          { label: "Without AMC",       sub: "No AMC Assigned",     value: metrics.noAmc,               icon: "bi-file-earmark-x",     color: "#6b7280" },
+          { label: "Total Assets",      sub: "Registered",          value: metrics.total,                icon: "bi-box-seam",           color: "#014aad" },
+          { label: "AMC Active",        sub: "Active",              value: metrics.amcActive,            icon: "bi-shield-check",       color: "#16a34a" },
+          { label: "AMC Expiring Soon", sub: "Expiring soon",       value: metrics.amcExpiringSoon,      icon: "bi-clock-history",      color: "#eab308" },
+          { label: "AMC Expired",       sub: "Expired",             value: metrics.amcExpired,           icon: "bi-shield-x",           color: "#dc2626" },
+          { label: "Warranty Expiring", sub: "Expiring soon",       value: metrics.warrantyExpiringSoon, icon: "bi-exclamation-circle", color: "#f97316" },
+          { label: "Without AMC",       sub: "No AMC",              value: metrics.noAmc,               icon: "bi-file-earmark-x",     color: "#6b7280" },
         ].map(({ label, sub, value, icon, color }) => (
-          <div className="col-md-2" key={label}>
+          <div className="col-lg-2 col-sm-4 col-6" key={label}>
             <div
-              className="bg-white p-3 rounded-4 border shadow-sm d-flex align-items-center gap-3 h-100"
-              style={{ borderLeft: `4px solid ${color}` }}
+              className="bg-white rounded-3 border shadow-sm d-flex align-items-center gap-2 h-100"
+              style={{ 
+                borderLeft: `3px solid ${color}`,
+                padding: "8px 10px",
+                minHeight: "54px"
+              }}
             >
               <div
                 className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: "42px", height: "42px", backgroundColor: `${color}18`, color }}
+                style={{ width: "30px", height: "30px", backgroundColor: `${color}12`, color }}
               >
-                <i className={`bi ${icon}`} style={{ fontSize: "1.1rem" }} />
+                <i className={`bi ${icon}`} style={{ fontSize: "0.85rem" }} />
               </div>
-              <div>
-                <div className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.6rem", letterSpacing: "0.05em" }}>{label}</div>
-                <h4 className="fw-bold mb-0 text-dark" style={{ letterSpacing: "-0.02em" }}>{value}</h4>
-                <div className="text-muted" style={{ fontSize: "0.68rem" }}>{sub}</div>
+              <div style={{ minWidth: 0, flexGrow: 1 }}>
+                <div className="text-muted fw-bold text-uppercase text-truncate" style={{ fontSize: "0.58rem", letterSpacing: "0.03em", lineHeight: "1.1" }} title={label}>
+                  {label}
+                </div>
+                <div className="d-flex align-items-baseline gap-1 text-truncate">
+                  <span className="fw-bold text-dark" style={{ letterSpacing: "-0.01em", fontSize: "0.95rem", lineHeight: "1.2" }}>
+                    {value}
+                  </span>
+                  <span className="text-muted text-truncate" style={{ fontSize: "0.58rem", fontWeight: 400 }} title={sub}>
+                    {sub}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

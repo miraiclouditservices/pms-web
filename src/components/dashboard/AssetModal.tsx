@@ -389,30 +389,6 @@ export default function AssetModal({ isOpen, onClose, onSave, editData, mode }: 
                     </div>
                   </div>
 
-                  <hr className="text-muted opacity-25 mt-4 mb-4" />
-
-                  {/* AMC Details */}
-                  <h6 className="fw-bold text-primary mb-3 d-flex align-items-center gap-2" style={{ color: '#014aad' }}>
-                    <i className="bi bi-calendar-check-fill"></i> AMC (Annual Maintenance Contract)
-                  </h6>
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">AMC Start Date</label>
-                      <input type="date" className="form-control form-control-sm bg-light border-0 py-2"
-                        value={formData.amcStartDate} onChange={(e) => setFormData({...formData, amcStartDate: e.target.value})} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label small fw-bold text-muted mb-1">AMC Expiry Date</label>
-                      <input type="date" className="form-control form-control-sm bg-light border-0 py-2"
-                        value={formData.amcEndDate} onChange={(e) => setFormData({...formData, amcEndDate: e.target.value})} />
-                    </div>
-                    <div className="col-md-12">
-                      <label className="form-label small fw-bold text-muted mb-1">AMC Provider / Vendor Name</label>
-                      <input type="text" className="form-control form-control-sm bg-light border-0 py-2"
-                        placeholder="e.g. Blue Star Services"
-                        value={formData.vendorName} onChange={(e) => setFormData({...formData, vendorName: e.target.value})} />
-                    </div>
-                  </div>
                 </div>
               )}
 

@@ -16,13 +16,20 @@ export default function UnitsPage() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
   useEffect(() => {
-    fetchUnits();
     fetchProperties();
     fetchFloors();
   }, []);
+
+  useEffect(() => {
+    // Only call backend if searchQuery is empty or has length >= 3
+    if (searchQuery.length === 0 || searchQuery.length >= 3) {
+      fetchUnits();
+    }
+  }, [currentPage, selectedPropertyId, selectedFloorId, selectedStatus, searchQuery]);
 
   const fetchFloors = async () => {
     try {
@@ -35,8 +42,22 @@ export default function UnitsPage() {
 
   const fetchUnits = async () => {
     try {
-      const response = await api.get('/units');
-      if (response.success) setUnits(response.data);
+      const searchParam = (searchQuery.length === 0 || searchQuery.length >= 3) ? searchQuery : "";
+      
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        property: selectedPropertyId,
+        floor: selectedFloorId,
+        unitStatus: selectedStatus,
+        search: searchParam
+      });
+
+      const response = await api.get(`/units?${queryParams.toString()}`);
+      if (response.success) {
+        setUnits(response.data);
+        setTotalPages(response.totalPages || 1);
+      }
     } catch (err) {
       console.error("Error fetching units:", err);
     }
@@ -88,23 +109,6 @@ export default function UnitsPage() {
     }
   };
 
-  // Filter Logic
-  const filteredUnits = units.filter(u => {
-    const matchProperty = selectedPropertyId === "all" || (u.property && u.property._id === selectedPropertyId);
-    const matchFloor = selectedFloorId === "all" || (u.floor && u.floor._id === selectedFloorId);
-    const matchStatus = selectedStatus === "all" || u.unitStatus === selectedStatus;
-    const searchString = searchQuery.toLowerCase();
-    const matchSearch = !searchQuery || 
-      (u.unitNumber && u.unitNumber.toString().toLowerCase().includes(searchString)) ||
-      (u.unitName && u.unitName.toLowerCase().includes(searchString)) ||
-      (u.unitType && u.unitType.toLowerCase().includes(searchString));
-      
-    return matchProperty && matchFloor && matchStatus && matchSearch;
-  });
-
-  const totalPages = Math.ceil(filteredUnits.length / itemsPerPage) || 1;
-  const paginatedUnits = filteredUnits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
   // Extract available floors from the floors state based on selected property
   const availableFloors = floors.filter(f => f.property === selectedPropertyId || (f.property && f.property._id === selectedPropertyId));
 
@@ -124,7 +128,7 @@ export default function UnitsPage() {
           <div className="d-flex w-100 position-absolute" style={{ bottom: '0', left: '0', zIndex: -1, borderColor: '#e0e0e0' }}></div>
           <div className="d-flex gap-4">
             <div style={{ paddingBottom: '8px', cursor: 'pointer', marginBottom: '-1px' }}>
-              <span className="fw-bold text-dark" style={{ fontSize: '1rem' }}>Units & Flats</span>
+              <span className="fw-bold text-dark" style={{ fontSize: '1rem' }}>Units and sft</span>
             </div>
           </div>
 
@@ -187,17 +191,17 @@ export default function UnitsPage() {
           <table className="table mb-0 border-0 text-nowrap" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
             <thead>
               <tr className="border-0">
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopLeftRadius: '8px' }}>S No</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Unit Details</th>
+                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopLeftRadius: '8px' }}>Sl no</th>
+                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property Sft details</th>
                 <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property / Floor</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Tenant</th>
+                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Tenant details</th>
                 <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Status</th>
                 <th className="py-3 px-4 fw-bold text-center" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopRightRadius: '8px' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedUnits.length > 0 ? (
-                paginatedUnits.map((unit, index) => (
+              {units.length > 0 ? (
+                units.map((unit, index) => (
                   <tr key={unit._id} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                     <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
                       {String((currentPage - 1) * itemsPerPage + index + 1).padStart(3, '0')}
@@ -209,28 +213,88 @@ export default function UnitsPage() {
                         </div>
                         <div>
                           <div className="d-flex align-items-center gap-2">
-                            <div className="fw-bold text-dark" style={{ fontSize: '0.9rem' }}>Unit {unit.unitNumber}</div>
+                            <div className="fw-bold text-dark" style={{ fontSize: '0.9rem' }}>
+                              {unit.unitName ? unit.unitName : `Unit ${unit.unitNumber}`}
+                            </div>
                             <span className="badge bg-light text-secondary border px-2 py-1" style={{ fontSize: '0.65rem' }}>{unit.sqft ? unit.sqft.toLocaleString() : 0} SFT</span>
                           </div>
-                          <span className="text-muted" style={{ fontSize: '0.75rem' }}>{unit.unitName || unit.unitType}</span>
+                          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                            {unit.unitName ? `Unit ${unit.unitNumber} • ${unit.unitType}` : unit.unitType}
+                          </span>
                         </div>
                       </div>
                     </td>
                     <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
                       <div className="fw-bold text-dark" style={{ fontSize: '0.85rem' }}>{unit.property?.propertyName || 'N/A'}</div>
-                      <span className="badge bg-light text-muted border rounded-pill px-2 py-1 mt-1" style={{ fontSize: '0.7rem' }}>Floor {unit.floor?.floorNumber || unit.floorNumber}</span>
+                      <span className="badge bg-light text-muted border rounded-pill px-2 py-1 mt-1" style={{ fontSize: '0.7rem' }}>
+                        {unit.floor?.floorName || `Floor ${unit.floor?.floorNumber || unit.floorNumber}`}
+                      </span>
                     </td>
                     <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', border: 'none' }}>
-                      {unit.tenant ? (
-                        <span className="fw-bold text-dark"><i className="bi bi-person me-1"></i> {unit.tenant.tenantName}</span>
+                      {unit.lease ? (
+                        <div>
+                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
+                            <i className="bi bi-file-earmark-text-fill text-info" style={{ fontSize: '0.85rem' }}></i>
+                            {unit.lease.tenantName || '—'}
+                          </div>
+                          {unit.lease.tenantContact && (
+                            <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
+                              <i className="bi bi-telephone-fill" style={{ fontSize: '0.65rem' }}></i>
+                              {unit.lease.tenantContact}
+                            </div>
+                          )}
+                          <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Lease Holder</span>
+                        </div>
+                      ) : unit.tenant ? (
+                        <div>
+                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
+                            <i className="bi bi-person-fill text-primary" style={{ fontSize: '0.85rem' }}></i>
+                            {unit.tenant.tenantName || '—'}
+                          </div>
+                          {unit.tenant.contactNumber && (
+                            <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
+                              <i className="bi bi-telephone-fill" style={{ fontSize: '0.65rem' }}></i>
+                              {unit.tenant.contactNumber}
+                            </div>
+                          )}
+                          <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Tenant</span>
+                        </div>
+                      ) : unit.owner ? (
+                        <div>
+                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
+                            <i className="bi bi-person-badge-fill text-success" style={{ fontSize: '0.85rem' }}></i>
+                            {unit.owner.ownerName || unit.ownerName || 'Office Owner'}
+                          </div>
+                          {unit.owner.contactNumber && (
+                            <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
+                              <i className="bi bi-telephone-fill" style={{ fontSize: '0.65rem' }}></i>
+                              {unit.owner.contactNumber}
+                            </div>
+                          )}
+                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Office Owner</span>
+                        </div>
+                      ) : unit.ownerName ? (
+                        <div>
+                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
+                            <i className="bi bi-person-badge-fill text-success" style={{ fontSize: '0.85rem' }}></i>
+                            {unit.ownerName}
+                          </div>
+                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Office Owner</span>
+                        </div>
                       ) : (
-                        <span className="text-muted small">No Tenant</span>
+                        <span className="text-muted small">—</span>
                       )}
                     </td>
                     <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      <span className={`badge bg-${getStatusColor(unit.unitStatus)} bg-opacity-10 text-${getStatusColor(unit.unitStatus)} rounded-pill px-3 py-1 border border-${getStatusColor(unit.unitStatus)} border-opacity-25`} style={{ fontSize: '0.75rem' }}>
-                        {unit.unitStatus}
-                      </span>
+                      {unit.isMeetingRoom ? (
+                        <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-1 border border-warning border-opacity-25" style={{ fontSize: '0.75rem' }}>
+                          🏢 Meeting Room
+                        </span>
+                      ) : (
+                        <span className={`badge bg-${getStatusColor(unit.unitStatus)} bg-opacity-10 text-${getStatusColor(unit.unitStatus)} rounded-pill px-3 py-1 border border-${getStatusColor(unit.unitStatus)} border-opacity-25`} style={{ fontSize: '0.75rem' }}>
+                          {unit.unitStatus || 'Available'}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 px-4 align-middle text-center" style={{ border: 'none' }}>
                       <div className="d-flex gap-2 justify-content-center align-items-center">
@@ -246,7 +310,7 @@ export default function UnitsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="text-center py-5">
+                  <td colSpan={6} className="text-center py-5">
                     <div className="d-flex flex-column align-items-center gap-3 py-4">
                       <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '80px', height: '80px' }}>
                         <i className="bi bi-door-open text-muted" style={{ fontSize: '2.5rem' }}></i>
@@ -266,7 +330,7 @@ export default function UnitsPage() {
         </div>
         
         {/* Pagination */}
-        {filteredUnits.length > 0 && (
+        {units.length > 0 && (
           <div className="d-flex justify-content-between align-items-center pt-3 border-top mt-2 flex-shrink-0">
             <span className="text-muted small">
               Page {currentPage} of {totalPages}
