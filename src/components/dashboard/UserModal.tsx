@@ -114,7 +114,7 @@ export default function UserModal({ isOpen, onClose, onSave, editData, mode }: U
                   <select className="form-select bg-light border-0 py-2" disabled={isReadOnly}
                     value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
                     <option value="Staff">Staff Member</option>
-                    <option value="Owner">Office Owner</option>
+                    <option value="Owner">OFFICE_OWNER</option>
                     <option value="Admin">System Admin</option>
                   </select>
                 </div>

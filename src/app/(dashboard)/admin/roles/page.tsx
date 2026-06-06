@@ -6,7 +6,7 @@ import styles from "@/styles/modules/Properties.module.css";
 export default function RolesPage() {
   const roles = [
     {
-      name: "Super Admin",
+      name: "SUPER_ADMIN",
       description: "Global system administrator with unrestricted access.",
       color: "#014aad", // Emerald
       bgClass: "bg-success bg-opacity-10 text-success",
@@ -18,7 +18,7 @@ export default function RolesPage() {
       ]
     },
     {
-      name: "Floor Admin",
+      name: "FLOOR_ADMIN",
       description: "Manages day-to-day operations for specific building floors.",
       color: "#3B82F6", // Blue
       bgClass: "bg-primary bg-opacity-10 text-primary",
@@ -30,7 +30,7 @@ export default function RolesPage() {
       ]
     },
     {
-      name: "Office Owner",
+      name: "OFFICE_OWNER",
       description: "Tenant or entity that owns/rents a specific office space.",
       color: "#F59E0B", // Amber
       bgClass: "bg-warning bg-opacity-10 text-warning",
@@ -42,7 +42,7 @@ export default function RolesPage() {
       ]
     },
     {
-      name: "Staff Admin",
+      name: "STAFF_ADMIN",
       description: "Operational staff managing visitors and daily tasks.",
       color: "#8B5CF6", // Purple
       bgClass: "bg-info bg-opacity-10 text-info",

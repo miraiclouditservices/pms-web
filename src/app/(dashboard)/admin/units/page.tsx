@@ -263,7 +263,7 @@ export default function UnitsPage() {
                         <div>
                           <div className="fw-bold text-dark d-flex align-items-center gap-1">
                             <i className="bi bi-person-badge-fill text-success" style={{ fontSize: '0.85rem' }}></i>
-                            {unit.owner.ownerName || unit.ownerName || 'Office Owner'}
+                            {unit.owner.ownerName || unit.ownerName || 'OFFICE_OWNER'}
                           </div>
                           {unit.owner.contactNumber && (
                             <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
@@ -271,7 +271,7 @@ export default function UnitsPage() {
                               {unit.owner.contactNumber}
                             </div>
                           )}
-                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Office Owner</span>
+                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>OFFICE_OWNER</span>
                         </div>
                       ) : unit.ownerName ? (
                         <div>
@@ -279,7 +279,7 @@ export default function UnitsPage() {
                             <i className="bi bi-person-badge-fill text-success" style={{ fontSize: '0.85rem' }}></i>
                             {unit.ownerName}
                           </div>
-                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Office Owner</span>
+                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>OFFICE_OWNER</span>
                         </div>
                       ) : (
                         <span className="text-muted small">—</span>

@@ -74,7 +74,7 @@ function MaterialsContent() {
   };
 
   const filteredMaterials = materials.filter((item) => {
-    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "Office Owner";
+    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "OFFICE_OWNER";
     if (isOwner) {
       const ownerUnitIds = (currentUser.assignedUnits || []).map((u: any) => (u._id || u).toString());
       const passUnitId = (item.unit?._id || item.unit || "").toString();
@@ -463,7 +463,7 @@ function MaterialsContent() {
                   <Row label="Total SqFt"  value={viewItem.floor?.totalSft ? `${viewItem.floor.totalSft} sqft` : "—"} />
                   {viewItem.floor?.assignedAdmin && (
                     <>
-                      <Divider label="Floor Admin" />
+                      <Divider label="FLOOR_ADMIN" />
                       <Row label="Name"  value={viewItem.floor.assignedAdmin.name} />
                       <Row label="Email" value={viewItem.floor.assignedAdmin.email || "—"} />
                       <Row label="Phone" value={viewItem.floor.assignedAdmin.phone || "—"} />
@@ -493,7 +493,7 @@ function MaterialsContent() {
                   <Row label="Area"      value={viewItem.unit?.sqft ? `${viewItem.unit.sqft} sqft` : "—"} />
                   {(viewItem.unit?.owner || viewItem.unit?.ownerName) && (
                     <>
-                      <Divider label="Office Owner" />
+                      <Divider label="OFFICE_OWNER" />
                       <Row label="Owner Name"     value={viewItem.unit?.owner?.ownerName    || viewItem.unit?.ownerName} />
                       <Row label="Contact"        value={viewItem.unit?.owner?.contactNumber    || "—"} />
                       <Row label="Alternate No"   value={viewItem.unit?.owner?.alternateNumber  || "—"} />

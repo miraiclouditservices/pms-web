@@ -3,17 +3,44 @@
 import React, { useState, useEffect } from 'react';
 import { api } from "@/utils/api";
 
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function PaymentsPage() {
   const [leases, setLeases] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [floors, setFloors] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'Invoices' | 'Payments'>('Invoices');
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  // Modals state
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  // Form inputs - Generate Invoices
+  const [genMonth, setGenMonth] = useState('June');
+  const [genYear, setGenYear] = useState(2026);
+
+  // Form inputs - Record Payment
+  const [payLease, setPayLease] = useState('');
+  const [payMonth, setPayMonth] = useState('June');
+  const [payYear, setPayYear] = useState(2026);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('Online');
+  const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [payTxnId, setPayTxnId] = useState('');
+  const [payRemarks, setPayRemarks] = useState('');
+
+  // Submit status
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     fetchInitialData();
@@ -22,19 +49,22 @@ export default function PaymentsPage() {
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
-      const [leasesRes, usersRes, propertiesRes, floorsRes, meRes] = await Promise.all([
+      const [leasesRes, invoicesRes, paymentsRes, meRes] = await Promise.all([
         api.get('/leases?limit=100'),
-        api.get('/users'),
-        api.get('/properties'),
-        api.get('/floors'),
+        api.get('/finance'),
+        api.get('/payments'),
         api.get('/auth/me')
       ]);
 
       if (meRes.success) setCurrentUser(meRes.data);
-      if (leasesRes.success) setLeases(leasesRes.data);
-      if (usersRes.success) setUsers(usersRes.data);
-      if (propertiesRes.success) setProperties(propertiesRes.data);
-      if (floorsRes.success) setFloors(floorsRes.data);
+      if (leasesRes.success) setLeases(leasesRes.data || []);
+      if (invoicesRes.success) setInvoices(invoicesRes.data || []);
+      if (paymentsRes.success) setPayments(paymentsRes.data || []);
+
+      // Set default lease for payment record
+      if (leasesRes.success && leasesRes.data && leasesRes.data.length > 0) {
+        setPayLease(leasesRes.data[0]._id);
+      }
     } catch (err) {
       console.error("Failed to load payments data:", err);
     } finally {
@@ -42,16 +72,99 @@ export default function PaymentsPage() {
     }
   };
 
-  // Toggle Tenant Lease Payment
-  const handleTenantPaymentToggle = async (leaseId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === "Paid" ? "Unpaid" : "Paid";
-    if (confirm(`Mark this lease's monthly due as ${nextStatus}?`)) {
+  // Mark invoice as paid
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    if (confirm("Are you sure you want to mark this invoice as Paid?")) {
       try {
-        const response = await api.put(`/leases/${leaseId}`, { paymentStatus: nextStatus });
-        if (response.success) {
-          // Re-fetch local leases list
-          const leasesRes = await api.get('/leases?limit=100');
-          if (leasesRes.success) setLeases(leasesRes.data);
+        const res = await api.put(`/finance/${invoiceId}/pay`, {});
+        if (res.success) {
+          const invoicesRes = await api.get('/finance');
+          if (invoicesRes.success) setInvoices(invoicesRes.data || []);
+          const paymentsRes = await api.get('/payments');
+          if (paymentsRes.success) setPayments(paymentsRes.data || []);
+        } else {
+          alert(res.error || "Failed to update invoice status");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("An error occurred while paying invoice");
+      }
+    }
+  };
+
+  // Generate Invoices
+  const handleGenerateInvoices = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMsg("");
+    try {
+      const res = await api.post('/finance/generate', { month: genMonth, year: Number(genYear) });
+      if (res.success) {
+        setShowGenerateModal(false);
+        const invoicesRes = await api.get('/finance');
+        if (invoicesRes.success) setInvoices(invoicesRes.data || []);
+      } else {
+        setErrorMsg(res.error || "Failed to generate invoices");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "An error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Record Payment
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payLease || !payAmount) {
+      setErrorMsg("Lease and Amount are required fields.");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMsg("");
+    try {
+      const payload = {
+        lease: payLease,
+        month: payMonth,
+        year: Number(payYear),
+        amount: Number(payAmount),
+        paymentMethod: payMethod,
+        paymentDate: payDate ? new Date(payDate) : undefined,
+        transactionId: payTxnId || undefined,
+        remarks: payRemarks || undefined
+      };
+      const res = await api.post('/payments', payload);
+      if (res.success) {
+        setShowPaymentModal(false);
+        setPayAmount('');
+        setPayTxnId('');
+        setPayRemarks('');
+        const [invoicesRes, paymentsRes] = await Promise.all([
+          api.get('/finance'),
+          api.get('/payments')
+        ]);
+        if (invoicesRes.success) setInvoices(invoicesRes.data || []);
+        if (paymentsRes.success) setPayments(paymentsRes.data || []);
+      } else {
+        setErrorMsg(res.error || "Failed to record payment");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "An error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete Payment
+  const handleDeletePayment = async (paymentId: string) => {
+    if (confirm("Are you sure you want to delete this payment record? This will not revert invoice state.")) {
+      try {
+        const res = await api.delete(`/payments/${paymentId}`);
+        if (res.success) {
+          const paymentsRes = await api.get('/payments');
+          if (paymentsRes.success) setPayments(paymentsRes.data || []);
+        } else {
+          alert(res.error || "Failed to delete payment record");
         }
       } catch (err) {
         console.error(err);
@@ -59,117 +172,48 @@ export default function PaymentsPage() {
     }
   };
 
-  // Toggle User Agreement Payment
-  const handleUserPaymentToggle = async (userId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === "Active" ? "Pending" : "Active";
-    if (confirm(`Change this staff/owner agreement state to ${nextStatus}?`)) {
-      try {
-        const response = await api.put(`/users/${userId}`, { agreementStatus: nextStatus });
-        if (response.success) {
-          // Re-fetch local users list
-          const usersRes = await api.get('/users');
-          if (usersRes.success) setUsers(usersRes.data);
-        }
-      } catch (err) {
-        console.error(err);
-      }
+  // Computations
+  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const totalCollected = invoices.filter(inv => inv.status === 'Paid').reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const outstandingDues = invoices.filter(inv => inv.status !== 'Paid').reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const recoveryRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+
+  // Filtered invoices
+  const filteredInvoices = invoices.filter(inv => {
+    const tenantName = (inv.tenantName || inv.lease?.tenantName || '').toLowerCase();
+    const invNumber = (inv.invoiceNumber || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = tenantName.includes(query) || invNumber.includes(query);
+    const matchesStatus = statusFilter === 'All' || inv.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Filtered payments
+  const filteredPayments = payments.filter(p => {
+    const tenantName = (p.lease?.tenantName || '').toLowerCase();
+    const txnId = (p.transactionId || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = tenantName.includes(query) || txnId.includes(query);
+    return matchesSearch;
+  });
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Paid': return 'bg-success bg-opacity-10 text-success border border-success border-opacity-25';
+      case 'Pending': return 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25';
+      case 'Overdue': return 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25';
+      default: return 'bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25';
     }
   };
 
-  // Core Mapped Data Arrays (Only including Active statuses as requested: "only staff management status active")
-  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'Office Owner';
-
-  const activeTenants = leases.filter(l => l.status === 'Active');
-  
-  const activeStaffAndOwners = users.filter(u => u.agreementStatus === 'Active');
-
-  // Unified list of active payees for calculations and display
-  const unifiedPayees: any[] = [];
-
-  // 1. Populate Tenants
-  activeTenants.forEach(l => {
-    const rent = l.monthlyRent || 0;
-    const cam = l.maintenanceCharges || 0;
-    const totalDues = rent + cam;
-    const isPaid = l.paymentStatus === 'Paid';
-
-    unifiedPayees.push({
-      id: l._id,
-      type: 'TenantLease',
-      name: l.tenantName || 'Tenant',
-      email: l.tenantContact || 'N/A',
-      role: 'Tenant',
-      spatial: l.units && l.units.length > 0 ? `Unit ${l.units[0].unitNumber}` : 'N/A',
-      dues: totalDues,
-      dueDay: l.dueDay || 5,
-      isPaid: isPaid,
-      statusLabel: isPaid ? 'Paid' : 'Unpaid'
-    });
-  });
-
-  // 2. Populate Active Staff & Owners (Floor Owners, Office Owners, Floor Admins)
-  activeStaffAndOwners.forEach(u => {
-    const dues = u.monthlyManagementAmount || 0;
-    // Map spatial names
-    const props = (u.assignedProperties || []).map((id: string) => {
-      const found = properties.find(p => p._id === id);
-      return found ? found.propertyName : '';
-    }).filter(Boolean).join(', ');
-
-    const flrs = (u.assignedFloors || []).map((id: string) => {
-      const found = floors.find(f => f._id === id);
-      return found ? (found.floorName || `Floor ${found.floorNumber}`) : '';
-    }).filter(Boolean).join(', ');
-
-    const isPaid = u.agreementStatus === 'Active'; // Mapped active status implies active fee cycle
-
-    unifiedPayees.push({
-      id: u._id,
-      type: 'UserAgreement',
-      name: u.name || 'Owner / Admin',
-      email: u.email || 'N/A',
-      role: u.role,
-      spatial: `${props || 'N/A'} - ${flrs || 'No Floor'}`,
-      dues: dues,
-      dueDay: u.paymentDueDay || 5,
-      isPaid: isPaid,
-      statusLabel: u.agreementStatus || 'Active'
-    });
-  });
-
-  // Real-time Receivables Calculations (based on active status)
-  const totalReceivables = unifiedPayees.reduce((acc, p) => acc + p.dues, 0);
-  const totalCollected = unifiedPayees.filter(p => p.isPaid).reduce((acc, p) => acc + p.dues, 0);
-  const totalOutstanding = totalReceivables - totalCollected;
-  const activeSourcesCount = unifiedPayees.length;
-
-  // Filter Search Results
-  const filteredPayees = unifiedPayees.filter(p => {
-    const nameMatch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const emailMatch = p.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSearch = nameMatch || emailMatch;
-    const matchesRole = roleFilter === "All" || p.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  const getRoleBadgeClass = (role: string) => {
-    switch (role) {
-      case 'Super Admin': return 'text-success border-success bg-success bg-opacity-10';
-      case 'Tenant': return 'text-success border-success bg-success bg-opacity-10';
-      case 'Floor Admin': return 'text-primary border-primary bg-primary bg-opacity-10';
-      case 'Office Owner': return 'text-purple border-purple bg-purple-light';
-      case 'Staff Admin': return 'text-info border-info bg-info bg-opacity-10';
-      default: return 'text-warning border-warning bg-warning bg-opacity-10';
-    }
-  };
-
-  const isSuperAdmin = currentUser?.role === 'Super Admin';
-  const isFloorAdmin = currentUser?.role === 'Floor Admin';
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin';
+  const isFloorAdmin = currentUser?.role === 'FLOOR_ADMIN';
+  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'OFFICE_OWNER';
 
   if (currentUser && !isSuperAdmin && !isFloorAdmin && !isOwner) {
     return (
       <div className="container py-5 text-center bg-white shadow-sm border rounded-xl mt-4" style={{ fontFamily: 'var(--font-geist-sans)' }}>
-        <i className="bi bi-shield-slash-fill text-danger fs-1 d-block mb-3"></i>
+        <i className="hgi-stroke hgi-shield-slash text-danger fs-1 d-block mb-3"></i>
         <h4 className="fw-bold text-dark">Unauthorized Access</h4>
         <p className="text-muted small">You do not have administrative permissions to view or handle the payments ledger.</p>
       </div>
@@ -177,232 +221,586 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="container-fluid p-0" style={{ fontFamily: 'var(--font-geist-sans)' }}>
-      <style jsx global>{`
-        .text-purple { color: #8b5cf6 !important; }
-        .border-purple { border-color: #8b5cf6 !important; }
-        .bg-purple { background-color: #8b5cf6 !important; }
-        .bg-purple-light { background-color: rgba(139, 92, 246, 0.1) !important; }
-        
+    <div className="container-fluid p-4" style={{ fontFamily: 'var(--font-geist-sans)', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+      <style jsx>{`
         .stat-card {
-          border-radius: 8px;
+          border-radius: 16px;
           background: #ffffff;
           border: 1px solid #e2e8f0;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.02);
           transition: all 0.25s ease;
         }
         .stat-card:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03);
+        }
+        .tab-btn {
+          font-weight: 600;
+          color: #64748b;
+          border: none;
+          background: none;
+          padding: 12px 20px;
+          position: relative;
+          transition: all 0.2s ease;
+          font-size: 0.95rem;
+        }
+        .tab-btn.active {
+          color: #014aad;
+        }
+        .tab-btn.active::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 20px;
+          right: 20px;
+          height: 3px;
+          background-color: #014aad;
+          border-radius: 99px;
+        }
+        .custom-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(4px);
+          z-index: 1050;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+        .custom-modal-content {
+          background: #ffffff;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 500px;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+          overflow: hidden;
+          animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
 
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      {/* Header & Navigation */}
+      <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <div>
-          <h2 className="fw-bold mb-0 text-dark" style={{ letterSpacing: "-0.02em", fontSize: "1.5rem" }}>
-            {isOwner 
-              ? `Office Payments & Collections: ${currentUser?.companyName || currentUser?.name || 'My Office'}`
-              : "Monthly Collections & Receivables"
-            }
+          <h2 className="fw-bold mb-1 text-dark" style={{ letterSpacing: "-0.03em" }}>
+            Accounts Ledger & Payments
           </h2>
           <p className="text-muted small mb-0">
-            {isOwner
-              ? "Monitor active tenant lease collections and your monthly spatial management dues."
-              : "Monitor active spatial subscriptions, landlord agreements, and billing dues."
-            }
+            Monitor invoices, record transactions, and manage monthly spatial receivables.
           </p>
+        </div>
+
+        {/* Global actions */}
+        <div className="d-flex gap-2">
+          {isSuperAdmin && (
+            <button
+              onClick={() => { setErrorMsg(''); setShowGenerateModal(true); }}
+              className="btn d-flex align-items-center gap-2 px-3 py-2 shadow-sm fw-semibold"
+              style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '8px', fontSize: '0.85rem' }}
+            >
+              <i className="hgi-stroke hgi-invoice-01 text-primary"></i> Generate Invoices
+            </button>
+          )}
+          {(isSuperAdmin || isFloorAdmin) && (
+            <button
+              onClick={() => { setErrorMsg(''); setShowPaymentModal(true); }}
+              className="btn text-white d-flex align-items-center gap-2 px-3 py-2 shadow-sm fw-semibold"
+              style={{ backgroundColor: '#014aad', border: 'none', borderRadius: '8px', fontSize: '0.85rem' }}
+            >
+              <i className="hgi-stroke hgi-plus"></i> Record Payment
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Dynamic Statistics Cards */}
+      {/* Bento Stats Grid */}
       <div className="row g-3 mb-4">
-        <div className="col-md-3">
-          <div className="stat-card p-3 d-flex align-items-center gap-3">
-            <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-wallet2 fs-4"></i>
+        <div className="col-lg-3 col-md-6">
+          <div className="stat-card p-4 d-flex align-items-center gap-3">
+            <div className="rounded-4 d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', backgroundColor: 'rgba(1, 74, 173, 0.1)', color: '#014aad' }}>
+              <i className="hgi-stroke hgi-invoice-02 fs-4"></i>
             </div>
             <div>
-              <span className="text-muted small d-block">Monthly Receivables</span>
-              <h4 className="fw-bold text-dark mb-0">₹{totalReceivables.toLocaleString()}</h4>
+              <span className="text-muted small d-block fw-semibold">Total Invoiced</span>
+              <h4 className="fw-bold text-dark mb-0">₹{totalInvoiced.toLocaleString()}</h4>
             </div>
           </div>
         </div>
 
-        <div className="col-md-3">
-          <div className="stat-card p-3 d-flex align-items-center gap-3">
-            <div className="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-check-circle-fill fs-4"></i>
+        <div className="col-lg-3 col-md-6">
+          <div className="stat-card p-4 d-flex align-items-center gap-3">
+            <div className="rounded-4 d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}>
+              <i className="hgi-stroke hgi-credit-card fs-4"></i>
             </div>
             <div>
-              <span className="text-muted small d-block">Total Collected</span>
+              <span className="text-muted small d-block fw-semibold">Total Collected</span>
               <h4 className="fw-bold text-success mb-0">₹{totalCollected.toLocaleString()}</h4>
             </div>
           </div>
         </div>
 
-        <div className="col-md-3">
-          <div className="stat-card p-3 d-flex align-items-center gap-3">
-            <div className="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-exclamation-triangle-fill fs-4"></i>
+        <div className="col-lg-3 col-md-6">
+          <div className="stat-card p-4 d-flex align-items-center gap-3">
+            <div className="rounded-4 d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+              <i className="hgi-stroke hgi-wallet-01 fs-4"></i>
             </div>
             <div>
-              <span className="text-muted small d-block">Outstanding Dues</span>
-              <h4 className="fw-bold text-danger mb-0">₹{totalOutstanding.toLocaleString()}</h4>
+              <span className="text-muted small d-block fw-semibold">Outstanding Dues</span>
+              <h4 className="fw-bold text-danger mb-0">₹{outstandingDues.toLocaleString()}</h4>
             </div>
           </div>
         </div>
 
-        <div className="col-md-3">
-          <div className="stat-card p-3 d-flex align-items-center gap-3">
-            <div className="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-shield-check fs-4"></i>
+        <div className="col-lg-3 col-md-6">
+          <div className="stat-card p-4 d-flex align-items-center gap-3">
+            <div className="rounded-4 d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', backgroundColor: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}>
+              <i className="hgi-stroke hgi-analytics-01 fs-4"></i>
             </div>
             <div>
-              <span className="text-muted small d-block">Active Revenue Sources</span>
-              <h4 className="fw-bold text-dark mb-0">{activeSourcesCount} Contracts</h4>
+              <span className="text-muted small d-block fw-semibold">Recovery Rate</span>
+              <h4 className="fw-bold text-dark mb-0">{recoveryRate}%</h4>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="d-flex justify-content-between align-items-center mb-3 gap-3">
-        <div className="bg-white border rounded px-3 d-flex align-items-center gap-2 flex-grow-1 shadow-sm" style={{ maxWidth: "340px", height: "36px" }}>
-          <i className="bi bi-search text-muted" style={{ fontSize: "0.85rem" }}></i>
-          <input
-            type="text"
-            className="border-0 bg-transparent w-100 shadow-none"
-            placeholder="Search payee name or official email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ outline: "none", fontSize: "0.85rem" }}
-          />
+      {/* Main Ledger Component Card */}
+      <div className="bg-white border rounded-4 shadow-sm overflow-hidden mb-4">
+        
+        {/* Tab Headers */}
+        <div className="d-flex justify-content-between align-items-center border-bottom border-light px-3 flex-wrap">
+          <div className="d-flex">
+            <button
+              className={`tab-btn ${activeTab === 'Invoices' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('Invoices'); setSearchQuery(''); }}
+            >
+              Invoices & Billing
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'Payments' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('Payments'); setSearchQuery(''); }}
+            >
+              Payment Records
+            </button>
+          </div>
+
+          {/* Search bar inside header */}
+          <div className="d-flex align-items-center gap-3 py-2">
+            <div className="position-relative" style={{ width: '280px' }}>
+              <input
+                type="text"
+                className="form-control px-3 py-2 shadow-sm"
+                placeholder={activeTab === 'Invoices' ? "Search invoice # or tenant..." : "Search tenant or transaction ID..."}
+                style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <i className="hgi-stroke hgi-search-01 position-absolute text-muted" style={{ right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.85rem' }}></i>
+            </div>
+
+            {activeTab === 'Invoices' && (
+              <select
+                className="form-select border shadow-sm fw-semibold text-muted bg-white"
+                style={{ width: '130px', height: '38px', borderRadius: '8px', fontSize: '0.85rem' }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="All">All States</option>
+                <option value="Paid">Paid</option>
+                <option value="Pending">Pending</option>
+                <option value="Overdue">Overdue</option>
+              </select>
+            )}
+          </div>
         </div>
 
-        {!isOwner && (
-          <select
-            className="form-select border rounded fw-medium text-muted bg-white shadow-sm"
-            style={{ width: "180px", height: "36px", fontSize: "0.85rem" }}
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            <option value="All">All Roles</option>
-            <option value="Tenant">Tenants</option>
-            <option value="Floor Admin">Floor Admins</option>
-            <option value="Office Owner">Office Owners</option>
-            <option value="Staff Admin">Staff Admins</option>
-          </select>
-        )}
-      </div>
-
-      {/* Unified Table Card */}
-      <div className="bg-white rounded border shadow-sm overflow-hidden">
+        {/* Tab Content Panels */}
         <div className="table-responsive">
-          <table className="table mb-0 align-middle text-nowrap" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead>
-              <tr>
-                {["S No", "Payee Details", "Access Role", "Spatial Block", "Monthly Receivable", "Due Date Status", "Collection Action"].map((col, i) => (
-                  <th
-                    key={col}
-                    className="py-3 px-4 fw-bold text-start"
-                    style={{
-                      backgroundColor: "#3f3f3f",
-                      color: "#ffffff",
-                      fontSize: "0.78rem",
-                      border: "none",
-                    }}
-                  >
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
+          {activeTab === 'Invoices' ? (
+            /* ==================== INVOICES TAB ==================== */
+            <table className="table align-middle text-nowrap table-hover mb-0">
+              <thead>
                 <tr>
-                  <td colSpan={7} className="text-center py-5">
-                    <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
-                    <div className="text-muted small mt-2">Loading active collections ledger...</div>
-                  </td>
+                  {["S No", "Invoice Number", "Tenant / Payee", "Billing Period", "Total Amount", "Due Date", "Status", "Action"].map((col, i) => (
+                    <th
+                      key={col}
+                      className="py-3 px-4 fw-bold text-start"
+                      style={{
+                        backgroundColor: '#3f3f3f',
+                        color: '#ffffff',
+                        fontSize: '0.78rem',
+                        border: 'none'
+                      }}
+                    >
+                      {col}
+                    </th>
+                  ))}
                 </tr>
-              ) : filteredPayees.length === 0 ? (
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-5">
+                      <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                      <div className="text-muted small mt-2">Fetching Billing Ledger...</div>
+                    </td>
+                  </tr>
+                ) : filteredInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-5 text-muted small">
+                      <i className="hgi-stroke hgi-file-check-02 fs-2 d-block mb-2 text-muted opacity-50"></i>
+                      No billing invoices match this query.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInvoices.map((inv, idx) => (
+                    <tr key={inv._id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {String(idx + 1).padStart(3, '0')}
+                      </td>
+                      <td className="py-3 px-4 fw-bold text-dark" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {inv.invoiceNumber || 'INV-TEMP'}
+                      </td>
+                      <td className="py-3 px-4" style={{ border: 'none' }}>
+                        <div className="fw-semibold text-dark" style={{ fontSize: '0.9rem' }}>
+                          {inv.tenantName || inv.lease?.tenantName || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {inv.month} {inv.year}
+                      </td>
+                      <td className="py-3 px-4 fw-bold text-dark" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        ₹{inv.totalAmount?.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                      </td>
+                      <td className="py-3 px-4" style={{ border: 'none' }}>
+                        <span className={`badge rounded-pill px-3 py-1 ${getStatusBadge(inv.status)}`} style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4" style={{ border: 'none' }}>
+                        {inv.status !== 'Paid' ? (
+                          <button
+                            onClick={() => handleMarkAsPaid(inv._id)}
+                            className="btn btn-sm px-3 py-1 shadow-sm fw-bold border border-success text-success bg-white rounded-pill hover-bg-success"
+                            style={{ fontSize: '0.75rem', transition: 'all 0.2s' }}
+                          >
+                            Mark Paid
+                          </button>
+                        ) : (
+                          <span className="text-success small fw-semibold d-flex align-items-center gap-1">
+                            <i className="hgi-stroke hgi-checkmark-circle-02"></i> Settled
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            /* ==================== PAYMENTS TAB ==================== */
+            <table className="table align-middle text-nowrap table-hover mb-0">
+              <thead>
                 <tr>
-                  <td colSpan={7} className="text-center py-5 text-muted small">
-                    <i className="bi bi-file-earmark-lock fs-2 d-block mb-2 text-muted opacity-50"></i>
-                    No active collection contracts match the selected query.
-                  </td>
+                  {["S No", "Tenant Name", "Period Mapped", "Amount Paid", "Date Logged", "Method", "Transaction ID", "Remarks", "Action"].map((col, i) => (
+                    <th
+                      key={col}
+                      className="py-3 px-4 fw-bold text-start"
+                      style={{
+                        backgroundColor: '#3f3f3f',
+                        color: '#ffffff',
+                        fontSize: '0.78rem',
+                        border: 'none'
+                      }}
+                    >
+                      {col}
+                    </th>
+                  ))}
                 </tr>
-              ) : filteredPayees.map((payee, index) => (
-                <tr
-                  key={`${payee.type}-${payee.id}`}
-                  style={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8fafc" }}
-                >
-                  <td className="py-2 px-4 text-muted" style={{ border: "none", fontSize: "0.8rem" }}>
-                    {String(index + 1).padStart(3, "0")}
-                  </td>
-
-                  <td className="py-2 px-4" style={{ border: "none" }}>
-                    <div className="fw-bold text-dark" style={{ fontSize: "0.85rem" }}>{payee.name}</div>
-                    <div className="text-muted" style={{ fontSize: "0.7rem" }}>{payee.email}</div>
-                  </td>
-
-                  <td className="py-2 px-4" style={{ border: "none" }}>
-                    <span className={`badge rounded-pill px-3 py-1 border ${getRoleBadgeClass(payee.role)}`} style={{ fontSize: "0.75rem", fontWeight: "bold" }}>
-                      {payee.role}
-                    </span>
-                  </td>
-
-                  <td className="py-2 px-4" style={{ border: "none" }}>
-                    <div className="small fw-semibold text-dark">{payee.spatial}</div>
-                    <span className="text-muted" style={{ fontSize: '0.65rem' }}>Spatial Mapping Block</span>
-                  </td>
-
-                  <td className="py-2 px-4" style={{ border: "none" }}>
-                    <div className="fw-bold text-primary" style={{ fontSize: "0.85rem", color: "#014aad" }}>
-                      ₹{payee.dues.toLocaleString()}
-                    </div>
-                  </td>
-
-                  <td className="py-2 px-4" style={{ border: "none" }}>
-                    <span className="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2" style={{ fontSize: "0.7rem" }}>
-                      {payee.dueDay}th of Month
-                    </span>
-                  </td>
-
-                  <td className="py-2 px-4" style={{ border: "none" }}>
-                    {payee.type === 'TenantLease' ? (
-                      <button
-                        className={`btn btn-sm rounded-pill fw-bold px-3 py-1 border transition-all ${
-                          payee.isPaid 
-                            ? "bg-success bg-opacity-10 text-success border-success" 
-                            : "bg-danger bg-opacity-10 text-danger border-danger"
-                        }`}
-                        style={{ fontSize: "0.7rem" }}
-                        onClick={() => handleTenantPaymentToggle(payee.id, payee.isPaid ? 'Paid' : 'Unpaid')}
-                      >
-                        {payee.isPaid ? 'Collected' : 'Pending Payment'}
-                      </button>
-                    ) : (
-                      <button
-                        className={`btn btn-sm rounded-pill fw-bold px-3 py-1 border transition-all ${
-                          payee.isPaid 
-                            ? "bg-success bg-opacity-10 text-success border-success" 
-                            : "bg-danger bg-opacity-10 text-danger border-danger"
-                        }`}
-                        style={{ fontSize: "0.7rem" }}
-                        onClick={() => handleUserPaymentToggle(payee.id, payee.statusLabel)}
-                      >
-                        {payee.isPaid ? 'Collected' : 'Suspended Cycle'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-5">
+                      <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                      <div className="text-muted small mt-2">Fetching Transactions Ledger...</div>
+                    </td>
+                  </tr>
+                ) : filteredPayments.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-5 text-muted small">
+                      <i className="hgi-stroke hgi-credit-card-validation fs-2 d-block mb-2 text-muted opacity-50"></i>
+                      No transaction records match this query.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPayments.map((p, idx) => (
+                    <tr key={p._id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {String(idx + 1).padStart(3, '0')}
+                      </td>
+                      <td className="py-3 px-4 fw-semibold text-dark" style={{ border: 'none', fontSize: '0.9rem' }}>
+                        {p.lease?.tenantName || 'N/A'}
+                      </td>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {p.month} {p.year}
+                      </td>
+                      <td className="py-3 px-4 fw-bold text-success" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        ₹{p.amount?.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                      </td>
+                      <td className="py-3 px-4" style={{ border: 'none' }}>
+                        <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1" style={{ fontSize: '0.75rem' }}>
+                          {p.paymentMethod}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem' }}>
+                        {p.transactionId || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-muted" style={{ border: 'none', fontSize: '0.85rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.remarks || '-'}
+                      </td>
+                      <td className="py-3 px-4" style={{ border: 'none' }}>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => handleDeletePayment(p._id)}
+                            className="btn btn-link text-danger p-0 d-flex align-items-center justify-content-center"
+                          >
+                            <i className="hgi-stroke hgi-delete-02 fs-5"></i>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
+
+      {/* ==================== MODAL: GENERATE MONTHLY INVOICES ==================== */}
+      {showGenerateModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-content">
+            <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
+              <h5 className="fw-bold mb-0 text-dark">Generate Invoices</h5>
+              <button onClick={() => setShowGenerateModal(false)} className="btn-close" style={{ outline: 'none', boxShadow: 'none' }}></button>
+            </div>
+            <form onSubmit={handleGenerateInvoices}>
+              <div className="p-4">
+                {errorMsg && (
+                  <div className="alert alert-danger py-2 small" role="alert">
+                    {errorMsg}
+                  </div>
+                )}
+                
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Select Target Month</label>
+                  <select
+                    className="form-select"
+                    value={genMonth}
+                    onChange={(e) => setGenMonth(e.target.value)}
+                    style={{ borderRadius: '8px' }}
+                  >
+                    {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Target Year</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={genYear}
+                    onChange={(e) => setGenYear(Number(e.target.value))}
+                    placeholder="2026"
+                    style={{ borderRadius: '8px' }}
+                    required
+                  />
+                </div>
+                
+                <p className="text-muted small">
+                  Note: This will automatically calculate escalations, rents, CAM charges, and GST amounts for all currently active tenant leases, generating corresponding invoice ledger rows.
+                </p>
+              </div>
+              <div className="p-4 bg-light d-flex justify-content-end gap-2 border-top">
+                <button
+                  type="button"
+                  onClick={() => setShowGenerateModal(false)}
+                  className="btn btn-outline-secondary px-4 fw-semibold"
+                  style={{ borderRadius: '8px', fontSize: '0.85rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn text-white px-4 fw-semibold"
+                  style={{ backgroundColor: '#014aad', borderRadius: '8px', fontSize: '0.85rem' }}
+                >
+                  {isSubmitting ? 'Generating...' : 'Start Generation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: RECORD NEW PAYMENT ==================== */}
+      {showPaymentModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-content" style={{ maxWidth: '550px' }}>
+            <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
+              <h5 className="fw-bold mb-0 text-dark">Record Payment Record</h5>
+              <button onClick={() => setShowPaymentModal(false)} className="btn-close" style={{ outline: 'none', boxShadow: 'none' }}></button>
+            </div>
+            <form onSubmit={handleRecordPayment}>
+              <div className="p-4" style={{ maxHeight: '450px', overflowY: 'auto' }}>
+                {errorMsg && (
+                  <div className="alert alert-danger py-2 small" role="alert">
+                    {errorMsg}
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Select Lease</label>
+                  <select
+                    className="form-select"
+                    value={payLease}
+                    onChange={(e) => setPayLease(e.target.value)}
+                    style={{ borderRadius: '8px' }}
+                    required
+                  >
+                    {leases.map(l => (
+                      <option key={l._id} value={l._id}>
+                        {l.tenantName} - {l.units && l.units.length > 0 ? `Unit ${l.units[0].unitNumber}` : 'No Unit'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label small fw-bold text-muted">Billing Month</label>
+                    <select
+                      className="form-select"
+                      value={payMonth}
+                      onChange={(e) => setPayMonth(e.target.value)}
+                      style={{ borderRadius: '8px' }}
+                    >
+                      {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label small fw-bold text-muted">Billing Year</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={payYear}
+                      onChange={(e) => setPayYear(Number(e.target.value))}
+                      style={{ borderRadius: '8px' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label small fw-bold text-muted">Amount Paid (₹)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      placeholder="e.g. 25000"
+                      style={{ borderRadius: '8px' }}
+                      required
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label small fw-bold text-muted">Payment Method</label>
+                    <select
+                      className="form-select"
+                      value={payMethod}
+                      onChange={(e) => setPayMethod(e.target.value)}
+                      style={{ borderRadius: '8px' }}
+                    >
+                      {['Online', 'Cash', 'Cheque', 'Bank Transfer'].map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Payment Date (Dated Payment)</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={payDate}
+                    onChange={(e) => setPayDate(e.target.value)}
+                    style={{ borderRadius: '8px' }}
+                    required
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Transaction / Cheque ID (Optional)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={payTxnId}
+                    onChange={(e) => setPayTxnId(e.target.value)}
+                    placeholder="e.g. TXN-1920392039"
+                    style={{ borderRadius: '8px' }}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Remarks (Optional)</label>
+                  <textarea
+                    className="form-control"
+                    value={payRemarks}
+                    onChange={(e) => setPayRemarks(e.target.value)}
+                    placeholder="e.g. Fully paid monthly rent"
+                    style={{ borderRadius: '8px' }}
+                    rows={2}
+                  />
+                </div>
+              </div>
+              <div className="p-4 bg-light d-flex justify-content-end gap-2 border-top">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="btn btn-outline-secondary px-4 fw-semibold"
+                  style={{ borderRadius: '8px', fontSize: '0.85rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn text-white px-4 fw-semibold"
+                  style={{ backgroundColor: '#014aad', borderRadius: '8px', fontSize: '0.85rem' }}
+                >
+                  {isSubmitting ? 'Recording...' : 'Submit Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

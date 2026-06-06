@@ -209,8 +209,8 @@ function LeasesContent() {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'Floor Admin': return 'text-primary border-primary bg-primary bg-opacity-10';
-      case 'Office Owner': return 'text-purple border-purple bg-purple-light';
+      case 'FLOOR_ADMIN': return 'text-primary border-primary bg-primary bg-opacity-10';
+      case 'OFFICE_OWNER': return 'text-purple border-purple bg-purple-light';
       default: return 'text-warning border-warning bg-warning bg-opacity-10';
     }
   };
@@ -261,7 +261,7 @@ function LeasesContent() {
 
   // Filtered Office Owners & Floor Admins who have management agreements
   const filteredUsers = users.filter(u => {
-    if (u.role !== 'Office Owner' && u.role !== 'Floor Admin') return false;
+    if (u.role !== 'OFFICE_OWNER' && u.role !== 'FLOOR_ADMIN') return false;
     const nameMatch = u.name ? u.name.toLowerCase().includes(search.toLowerCase()) : false;
     const emailMatch = u.email ? u.email.toLowerCase().includes(search.toLowerCase()) : false;
     const matchesSearch = nameMatch || emailMatch;

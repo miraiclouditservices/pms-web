@@ -172,7 +172,7 @@ function BookingsContent() {
 
   // Filters
   const filteredBookings = bookings.filter(b => {
-    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "Office Owner";
+    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "OFFICE_OWNER";
     if (isOwner) {
       const matchName = (b.bookedBy || "").toLowerCase().includes(currentUser.name?.toLowerCase() || "");
       const matchParticulars = (b.bookingParticulars || "").toLowerCase().includes((currentUser.companyName || "").toLowerCase());
@@ -208,7 +208,7 @@ function BookingsContent() {
   
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-  const isAdmin = currentUser?.role === 'Super Admin' || currentUser?.role === 'Admin' || currentUser?.role === 'Floor Admin';
+  const isAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'FLOOR_ADMIN';
 
   return (
     <div className="container-fluid p-0" style={{ fontFamily: 'var(--font-geist-sans)' }}>

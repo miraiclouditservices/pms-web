@@ -46,8 +46,11 @@ export default function FloorsPage() {
   const fetchProperties = async () => {
     try {
       const response = await api.get('/properties');
-      if (response.success) {
+      if (response.success && response.data) {
         setProperties(response.data);
+        if (response.data.length > 0) {
+          setSelectedPropertyId(response.data[0]._id);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -178,7 +181,7 @@ export default function FloorsPage() {
                       { label: "Occupied Space", value: `${viewFloor.occupiedSft ? viewFloor.occupiedSft.toLocaleString() : 0} SFT`, icon: "bi-building-fill" },
                       { label: "Available Space", value: `${((viewFloor.totalSft || 0) - (viewFloor.occupiedSft || 0)).toLocaleString()} SFT`, icon: "bi-check-circle-fill", valueClass: "text-success" },
                       { label: "Property Owner", value: viewFloor.assignedOwner?.ownerName || 'Unassigned', icon: "bi-person-fill" },
-                      { label: "Floor Admin", value: viewFloor.assignedAdmin?.name || 'Unassigned', icon: "bi-person-badge-fill" },
+                      { label: "FLOOR_ADMIN", value: viewFloor.assignedAdmin?.name || 'Unassigned', icon: "bi-person-badge-fill" },
                       { label: "Generated Revenue", value: `₹${viewFloor.floorRevenue ? viewFloor.floorRevenue.toLocaleString() : 0}`, icon: "bi-currency-rupee" }
                     ].map((item, idx, arr) => (
                       <div 
@@ -398,15 +401,49 @@ export default function FloorsPage() {
                       </td>
                       <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
                         {floor.assignedOwner ? (
-                          <span style={{ fontSize: '0.85rem', color: '#333', fontWeight: '500' }}><span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-1 me-2" style={{ fontSize: '0.65rem' }}>Owner</span>{floor.assignedOwner.ownerName}</span>
+                          <div className="d-flex flex-column gap-1">
+                            <span style={{ fontSize: '0.85rem', color: '#333', fontWeight: '500' }}>
+                              <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-1 me-2" style={{ fontSize: '0.65rem' }}>Owner</span>
+                              {floor.assignedOwner.ownerName}
+                            </span>
+                          </div>
                         ) : floor.assignedAdmin ? (
-                          <span style={{ fontSize: '0.85rem', color: '#333', fontWeight: '500' }}><span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 me-2" style={{ fontSize: '0.65rem' }}>Admin</span>{floor.assignedAdmin.name}</span>
+                          <div className="d-flex flex-column gap-1">
+                            <span style={{ fontSize: '0.85rem', color: '#333', fontWeight: '500' }}>
+                              <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 me-2" style={{ fontSize: '0.65rem' }}>Admin</span>
+                              {floor.assignedAdmin.name}
+                            </span>
+                          </div>
                         ) : (
                           <span className="badge bg-light text-muted border rounded-pill px-2 py-1" style={{ fontSize: '0.7rem' }}>Unassigned</span>
                         )}
                       </td>
-                      <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
-                        {floor.assignedOwner?.contactNumber || floor.assignedAdmin?.phoneNumber || 'N/A'}
+                      <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
+                        {floor.assignedOwner ? (
+                          <div className="d-flex flex-column">
+                            <span style={{ fontSize: '0.85rem', color: '#4b5563' }}>
+                              <i className="bi bi-telephone-fill me-1" style={{ fontSize: '0.75rem', color: '#9ca3af' }}></i>
+                              {floor.assignedOwner.contactNumber || 'N/A'}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                              <i className="bi bi-envelope-fill me-1" style={{ fontSize: '0.75rem', color: '#9ca3af' }}></i>
+                              {floor.assignedOwner.emailId || 'N/A'}
+                            </span>
+                          </div>
+                        ) : floor.assignedAdmin ? (
+                          <div className="d-flex flex-column">
+                            <span style={{ fontSize: '0.85rem', color: '#4b5563' }}>
+                              <i className="bi bi-telephone-fill me-1" style={{ fontSize: '0.75rem', color: '#9ca3af' }}></i>
+                              {floor.assignedAdmin.phoneNumber || 'N/A'}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                              <i className="bi bi-envelope-fill me-1" style={{ fontSize: '0.75rem', color: '#9ca3af' }}></i>
+                              {floor.assignedAdmin.email || 'N/A'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted" style={{ fontSize: '0.85rem' }}>N/A</span>
+                        )}
                       </td>
                       <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
                         <span className="fw-bold text-dark">{floor.totalSft ? floor.totalSft.toLocaleString() : 0} SFT</span>

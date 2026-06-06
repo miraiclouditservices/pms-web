@@ -108,7 +108,7 @@ export default function SettingsPage() {
 
   if (loading) return <div className="d-flex align-items-center justify-content-center" style={{ height: "60vh" }}><div className="spinner-border" style={{ color: "#014aad" }} /></div>;
 
-  const displayRole = currentUser?.role === "Owner" ? "Office Owner" : currentUser?.role === "Admin" ? "Super Admin" : currentUser?.role || "User";
+  const displayRole = currentUser?.role === "Owner" ? "OFFICE_OWNER" : currentUser?.role === "Admin" ? "SUPER_ADMIN" : currentUser?.role || "User";
 
   return (
     <div className="container-fluid p-0 pb-5">

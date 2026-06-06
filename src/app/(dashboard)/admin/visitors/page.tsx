@@ -69,7 +69,7 @@ export default function VisitorsPage() {
   };
 
   const filteredVisitors = visitors.filter(v => {
-    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "Office Owner";
+    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "OFFICE_OWNER";
     if (isOwner) {
       const ownerUnitIds = (currentUser.assignedUnits || []).map((u: any) => (u._id || u).toString());
       const visitorUnitId = (v.unit?._id || v.unit || "").toString();

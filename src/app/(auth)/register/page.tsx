@@ -11,7 +11,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "Super Admin"
+    role: "SUPER_ADMIN"
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,7 +50,7 @@ export default function RegisterPage() {
             email: "",
             password: "",
             confirmPassword: "",
-            role: "Super Admin"
+            role: "SUPER_ADMIN"
           });
         }
       }
@@ -176,7 +176,7 @@ export default function RegisterPage() {
                     <p className="text-muted small mb-0" style={{ fontSize: '0.7rem' }}>Full access to all dashboard modules and user management.</p>
                   </div>
                 </div>
-                <input type="hidden" value="Super Admin" />
+                <input type="hidden" value="SUPER_ADMIN" />
               </div>
             </div>
 

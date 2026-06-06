@@ -25,11 +25,11 @@ export default function Sidebar() {
 
   const displayName = user ? user.name : "Admin User";
   const displayRole = user 
-    ? (user.role === "Admin" ? "Super Admin" : user.role === "Owner" ? "Office Owner" : user.role) 
-    : "Super Admin";
+    ? (user.role === "Admin" ? "SUPER_ADMIN" : user.role === "Owner" ? "OFFICE_OWNER" : user.role) 
+    : "SUPER_ADMIN";
   const avatarChar = displayName ? displayName.charAt(0).toUpperCase() : "A";
 
-  const isSuperAdmin = user?.role === "Super Admin" || user?.role === "Admin";
+  const isSuperAdmin = user?.role === "SUPER_ADMIN" || user?.role === "Admin";
   const permissions = (user as any)?.permissions || [];
 
   const hasAccess = (permission: string) => isSuperAdmin || permissions.includes(permission);
@@ -38,35 +38,35 @@ export default function Sidebar() {
     {
       label: "Main",
       items: [
-        ...(isSuperAdmin || permissions.length > 0 ? [{ name: "Dashboard", path: "/admin/dashboard", icon: "bi-grid-1x2-fill" }] : []),
-        ...(hasAccess('view_properties') ? [{ name: "Properties", path: "/admin/properties", icon: "bi-building-fill" }] : []),
-        ...(hasAccess('view_floors') ? [{ name: "Floors", path: "/admin/floors", icon: "bi-layers-fill" }] : []),
-        ...(hasAccess('view_floors') ? [{ name: "Units and sft", path: "/admin/units", icon: "bi-door-open-fill" }] : []),
-        ...(hasAccess('view_tenants') ? [{ name: "Leases", path: "/admin/leases", icon: "bi-file-earmark-text-fill" }] : []),
-        ...(hasAccess('view_finance') ? [
-            { name: "Finance / Billing", path: "/admin/finance", icon: "bi-receipt" }
+        ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' || permissions.length > 0 ? [{ name: "Dashboard", path: "/admin/dashboard", icon: "hgi-dashboard-square-01" }] : []),
+        ...(hasAccess('view_properties') || user?.role === 'STAFF_ADMIN' ? [{ name: "Properties", path: "/admin/properties", icon: "hgi-building-03" }] : []),
+        ...(hasAccess('view_floors') || user?.role === 'STAFF_ADMIN' ? [{ name: "Floors", path: "/admin/floors", icon: "hgi-layers-01" }] : []),
+        ...(hasAccess('view_floors') || user?.role === 'STAFF_ADMIN' ? [{ name: "Units and sft", path: "/admin/units", icon: "hgi-door-01" }] : []),
+        ...(hasAccess('view_tenants') || user?.role === 'STAFF_ADMIN' ? [{ name: "Leases", path: "/admin/leases", icon: "hgi-agreement-01" }] : []),
+        ...(hasAccess('view_finance') || user?.role === 'STAFF_ADMIN' ? [
+            { name: "Finance / Billing", path: "/admin/finance", icon: "hgi-invoice-01" }
         ] : []),
-        ...(user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Floor Admin' || user?.role === 'Owner' || user?.role === 'Office Owner' ? [
-            { name: "Payments", path: "/admin/payments", icon: "bi-credit-card-fill" }
+        ...(user?.role === 'SUPER_ADMIN' || user?.role === 'Admin' || user?.role === 'FLOOR_ADMIN' || user?.role === 'Owner' || user?.role === 'OFFICE_OWNER' || user?.role === 'STAFF_ADMIN' ? [
+            { name: "Payments", path: "/admin/payments", icon: "hgi-credit-card" }
         ] : []),
       ]
     },
     {
       label: "Operations",
       items: [
-        ...(hasAccess('manage_helpdesk') ? [
-          { name: "Helpdesk", path: "/admin/helpdesk", icon: "bi-headset" }
+        ...(hasAccess('manage_helpdesk') || user?.role === 'STAFF_ADMIN' ? [
+          { name: "Helpdesk", path: "/admin/helpdesk", icon: "hgi-headset" }
         ] : []),
-        ...(hasAccess('manage_visitors') ? [
-            { name: "Visitors", path: "/admin/visitors", icon: "bi-person-badge-fill" },
-            { name: "Materials", path: "/admin/materials", icon: "bi-cart-fill" },
-            { name: "Bookings", path: "/admin/bookings", icon: "bi-calendar-event-fill" }
+        ...(hasAccess('manage_visitors') || user?.role === 'STAFF_ADMIN' ? [
+            { name: "Visitors", path: "/admin/visitors", icon: "hgi-identity-card" },
+            { name: "Materials", path: "/admin/materials", icon: "hgi-package" },
+            { name: "Bookings", path: "/admin/bookings", icon: "hgi-calendar-01" }
         ] : []),
-        ...(isSuperAdmin || user?.role === 'Staff Admin' || user?.role === 'Floor Admin' ? [
-            { name: "Assets", path: "/admin/assets", icon: "bi-tools" }
+        ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' || user?.role === 'FLOOR_ADMIN' ? [
+            { name: "Assets", path: "/admin/assets", icon: "hgi-tools" }
         ] : []),
-        ...(isSuperAdmin || user?.role === 'Staff Admin' ? [
-            { name: "Vendors", path: "/admin/vendors", icon: "bi-truck" }
+        ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' ? [
+            { name: "Vendors", path: "/admin/vendors", icon: "hgi-truck" }
         ] : [])
       ]
     },
@@ -74,24 +74,24 @@ export default function Sidebar() {
       label: "Management",
       items: [
         ...(hasAccess('manage_staff') ? [
-          { name: "Access Management", path: "/admin/users", icon: "bi-person-badge" },
+          { name: "Access Management", path: "/admin/users", icon: "hgi-user-shield-01" },
         ] : []),
         ...(hasAccess('view_analytics') ? [
-            { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "bi-pie-chart-fill" }
+            { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "hgi-pie-chart" }
         ] : []),
-        ...(isSuperAdmin || user?.role === 'Staff Admin' ? [
-            { name: "Reports", path: "/admin/reports", icon: "bi-file-earmark-bar-graph-fill" }
+        ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' ? [
+            { name: "Reports", path: "/admin/reports", icon: "hgi-analytics-01" }
         ] : [])
       ]
     },
     {
       label: "Account",
       items: [
-        { name: "Settings & Profile", path: "/admin/settings", icon: "bi-gear-fill" }
+        { name: "Settings & Profile", path: "/admin/settings", icon: "hgi-settings-01" }
       ]
     }
   ].map(group => {
-    if (user?.role === "Owner" || user?.role === "Office Owner") {
+    if (user?.role === "Owner" || user?.role === "OFFICE_OWNER") {
       const itemsToRemove = ["Properties", "Floors", "Units and sft", "Tenants", "Leases", "Owners", "Assets", "Vendors", "Reports"];
       return {
         ...group,
@@ -106,7 +106,7 @@ export default function Sidebar() {
       {/* Brand */}
       <div className={styles.brand}>
         <div className={styles.brandIcon}>
-          <i className="bi bi-shield-check"></i>
+          <i className="hgi-stroke hgi-shield-01"></i>
         </div>
         <span className={styles.brandName}>PMS Global</span>
       </div>
@@ -125,7 +125,7 @@ export default function Sidebar() {
                       href={item.path} 
                       className={`${styles.navLink} ${isActive ? styles.navLinkActive : ""}`}
                     >
-                      <i className={`bi ${item.icon} ${styles.navIcon}`}></i>
+                      <i className={`hgi-stroke ${item.icon} ${styles.navIcon}`}></i>
                       <span>{item.name}</span>
                     </Link>
                   </li>

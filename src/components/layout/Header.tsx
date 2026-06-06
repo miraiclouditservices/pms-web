@@ -81,8 +81,8 @@ export default function Header() {
 
   const displayName = user ? user.name : "Admin User";
   const displayRole = user 
-    ? (user.role === "Admin" ? "Super Admin" : user.role === "Owner" ? "Office Owner" : user.role) 
-    : "Super Admin";
+    ? (user.role === "Admin" ? "SUPER_ADMIN" : user.role === "Owner" ? "OFFICE_OWNER" : user.role) 
+    : "SUPER_ADMIN";
   const avatarChar = displayName ? displayName.charAt(0).toUpperCase() : "A";
   return (
     <header className={styles.header}>

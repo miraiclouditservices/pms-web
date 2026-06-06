@@ -148,7 +148,7 @@ export default function FloorDetailsPage() {
               onChange={(e) => setUserRole(e.target.value)}
               style={{ width: '130px', cursor: 'pointer' }}
             >
-              <option value="super_admin">Super Admin</option>
+              <option value="super_admin">SUPER_ADMIN</option>
               <option value="property_manager">Prop. Manager</option>
               <option value="viewer">Viewer</option>
             </select>

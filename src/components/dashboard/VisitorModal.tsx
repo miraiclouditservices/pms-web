@@ -63,7 +63,7 @@ export default function VisitorModal({ isOpen, onClose, onSave, editData, mode }
   const set = (k: string, v: any) => setFormData((p: any) => ({ ...p, [k]: v }));
 
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'Office Owner';
+  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'OFFICE_OWNER';
 
   // ── Load properties and user info ─────────────────────────────────────────────
   useEffect(() => {

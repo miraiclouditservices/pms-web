@@ -43,9 +43,9 @@ export default function HelpdeskPage() {
         try {
           const u = JSON.parse(storedUser);
           setCurrentUser(u);
-          if (u.role === "Admin" || u.role === "Super Admin") {
+          if (u.role === "Admin" || u.role === "SUPER_ADMIN") {
             setUserRole("super_admin");
-          } else if (u.role === "Owner" || u.role === "Office Owner") {
+          } else if (u.role === "Owner" || u.role === "OFFICE_OWNER") {
             setUserRole("technician");
           } else {
             setUserRole("viewer");
@@ -86,7 +86,7 @@ export default function HelpdeskPage() {
   const technicians = Array.from(new Set(complaints.map(c => c.allocatedTo).filter(Boolean)));
 
   const filteredComplaints = complaints.filter(c => {
-    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "Office Owner";
+    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "OFFICE_OWNER";
     if (isOwner) {
       const matchName = (c.tenant?.tenantName || "").toLowerCase().includes(currentUser.name.toLowerCase()) ||
                         (c.tenant?.companyName || "").toLowerCase().includes((currentUser.companyName || "").toLowerCase()) ||

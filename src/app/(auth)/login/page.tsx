@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 
 export default function LoginPage() {
-  const [selectedRole, setSelectedRole] = useState("super_admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -25,28 +25,15 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Map frontend selection to backend roles
-      const roleMap: Record<string, string> = {
-        super_admin: 'Super Admin',
-        floor_admin: 'Floor Admin',
-        office_owner: 'Office Owner',
-      };
-      const role = roleMap[selectedRole] || 'Super Admin';
-      
       const response = await api.post('/auth/login', { 
         email, 
-        password,
-        role 
+        password
       });
       
       if (response.success) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.user));
-        
-        // Redirect based on role
-        if (response.user.role === "Super Admin" || response.user.role === "Staff Admin" || response.user.role === "Floor Admin" || response.user.role === "Office Owner") {
-           router.replace('/admin/dashboard');
-        }
+        router.replace('/admin/dashboard');
       }
     } catch (err: any) {
       setError(err.message || "Invalid credentials. Please try again.");
@@ -56,199 +43,226 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column flex-lg-row overflow-hidden bg-white">
-      {/* Brand Side (Visible on Desktop) */}
-      <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-between p-5 position-relative overflow-hidden" 
-           style={{ 
-             background: 'linear-gradient(135deg, #090f26 0%, #014aad 100%)',
-             color: 'white'
-           }}>
-        {/* Animated Background Mesh */}
-        <div className="position-absolute top-0 start-0 w-100 h-100 opacity-20" style={{ 
-          backgroundImage: 'radial-gradient(circle at 0% 0%, rgba(255,255,255,0.2) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(255,255,255,0.2) 0%, transparent 50%)',
-          zIndex: 0
-        }}></div>
-
-        <div className="position-relative z-1">
-          <div className="d-flex align-items-center gap-3 mb-4">
-            <div className="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center shadow-lg" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-clouds-fill fs-4"></i>
+    <div className="d-flex vh-100 flex-column flex-md-row bg-white font-sans overflow-hidden">
+      
+      {/* Left Side: Login Form */}
+      <div className="col-12 col-md-6 col-lg-5 d-flex flex-column p-4 p-md-5 bg-white position-relative h-100 overflow-y-auto">
+        
+        {/* Brand Logo */}
+        <div className="mb-auto pb-4">
+          <div className="d-flex align-items-center gap-2">
+            <div className="bg-primary text-white rounded d-flex align-items-center justify-content-center shadow-sm" style={{ width: '32px', height: '32px' }}>
+              <i className="bi bi-clouds-fill fs-5"></i>
             </div>
-            <span className="fw-bold fs-4 tracking-tight">MIRAI CLOUD</span>
-          </div>
-
-          <div className="mt-5 pt-4">
-            <p className="fw-light text-white text-opacity-75" style={{ maxWidth: '500px', fontSize: '0.95rem', lineHeight: '1.6' }}>
-              Mirai Cloud is a next-generation property and tenant management platform designed for global enterprises.
-              Unify your real estate operations, automate workflows, and gain real-time visibility across all locations.
-            </p>
+            <span className="fw-bold fs-5 text-primary" style={{ letterSpacing: '-0.02em' }}>Mirai Cloud</span>
           </div>
         </div>
 
-        {/* Stats Section & Footer */}
-        <div className="position-relative z-1">
-          <div className="row g-3 mb-4">
-            <div className="col-6">
-              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-building me-1"></i> Properties Managed</div>
-                <div className="fs-5 fw-bold text-white">5000+</div>
-              </div>
-            </div>
-            <div className="col-6">
-              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-people me-1"></i> Active Tenants</div>
-                <div className="fs-5 fw-bold text-white">25K+</div>
-              </div>
-            </div>
-            <div className="col-6">
-              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-cash-coin me-1"></i> Rental Value</div>
-                <div className="fs-5 fw-bold text-white">$1.2B+</div>
-              </div>
-            </div>
-            <div className="col-6">
-              <div className="p-3 rounded-3 text-center" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <div className="text-white-50 mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-cpu me-1"></i> System Uptime</div>
-                <div className="fs-5 fw-bold text-white">99.99%</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="d-flex justify-content-between align-items-center small text-white text-opacity-40 fw-bold text-uppercase" style={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
-            <div>v5.0.0 Build</div>
-            <div>© 2026 MIRAI CLOUD</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Login Form Side */}
-      <div className="col-lg-6 d-flex flex-column justify-content-center align-items-center p-4 p-md-5">
-        <div className="w-100" style={{ maxWidth: '380px', padding: '20px 0' }}>
-          {/* Mobile Header */}
-          <div className="d-lg-none text-center mb-4">
-            <div className="bg-emerald text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2 shadow-sm" style={{ width: '56px', height: '56px' }}>
-              <i className="bi bi-clouds-fill fs-3"></i>
-            </div>
-            <h4 className="fw-bold mb-1">MIRAI CLOUD</h4>
-          </div>
-
-          <div className="mb-4">
-            <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Welcome to Mirai Cloud</h3>
-            <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>Sign in to manage global properties, automation, and billing.</p>
-          </div>
+        {/* Login Form Container */}
+        <div className="w-100 mx-auto my-auto" style={{ maxWidth: '400px' }}>
+          <h2 className="fw-bold text-dark mb-1" style={{ fontSize: '1.75rem', letterSpacing: '-0.03em' }}>Log in to your Account</h2>
+          <p className="text-muted mb-4 pb-2" style={{ fontSize: '0.9rem' }}>Welcome back! Enter your details to log in:</p>
 
           <form onSubmit={handleLogin}>
-            {/* Role Switcher — 3 tabs */}
-            <div className="mb-4 bg-light p-1 rounded-pill d-flex gap-1">
-              <button 
-                type="button" 
-                onClick={() => setSelectedRole('super_admin')}
-                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'super_admin' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`}
-                style={{ fontSize: '0.65rem' }}
-              >
-                Super Admin
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setSelectedRole('floor_admin')}
-                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'floor_admin' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`}
-                style={{ fontSize: '0.65rem' }}
-              >
-                Floor Admin
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setSelectedRole('office_owner')}
-                className={`btn btn-sm rounded-pill flex-grow-1 py-1 fw-bold transition-all ${selectedRole === 'office_owner' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`}
-                style={{ fontSize: '0.65rem' }}
-              >
-                Office Owner
-              </button>
-            </div>
-
-            {/* Form Fields */}
+            
+            {/* Email Field */}
             <div className="mb-3">
-              <label className="form-label text-muted small fw-bold text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.05em' }}>Corporate Identity</label>
-              <div className="input-group border-bottom pb-1 position-relative">
-                <span className="input-group-text bg-transparent border-0 px-0 me-3"><i className="bi bi-envelope text-muted" style={{ fontSize: '0.85rem' }}></i></span>
+              <div className="input-group custom-input-group rounded bg-white">
+                <span className="input-group-text bg-white border-end-0 px-3 text-muted">
+                  <i className="bi bi-envelope"></i>
+                </span>
                 <input 
                   type="email" 
-                  className="form-control bg-transparent border-0 px-0 shadow-none" 
-                  placeholder="name@company.com" 
+                  className="form-control bg-white border-start-0 ps-0 shadow-none text-dark clean-input" 
+                  placeholder="Email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={{ fontSize: '0.9rem' }}
+                  style={{ fontSize: '0.95rem', height: '48px' }}
                   required 
                 />
               </div>
             </div>
 
-            <div className="mb-4">
-              <label className="form-label text-muted small fw-bold text-uppercase mb-2" style={{ fontSize: '0.6rem', letterSpacing: '0.05em' }}>Security Credentials</label>
-              <div className="input-group border-bottom pb-1">
-                <span className="input-group-text bg-transparent border-0 px-0 me-3"><i className="bi bi-lock text-muted" style={{ fontSize: '0.85rem' }}></i></span>
+            {/* Password Field */}
+            <div className="mb-3">
+              <div className="input-group custom-input-group rounded bg-white">
+                <span className="input-group-text bg-white border-end-0 px-3 text-muted">
+                  <i className="bi bi-lock"></i>
+                </span>
                 <input 
-                  type="password" 
-                  className="form-control bg-transparent border-0 px-0 shadow-none" 
-                  placeholder="••••••••" 
+                  type={showPassword ? "text" : "password"} 
+                  className="form-control bg-white border-start-0 border-end-0 px-0 shadow-none text-dark clean-input" 
+                  placeholder="Password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ fontSize: '0.9rem' }}
+                  style={{ fontSize: '0.95rem', height: '48px' }}
                   required 
                 />
+                <span 
+                  className="input-group-text bg-white border-start-0 px-3 text-muted" 
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  <i className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"}></i>
+                </span>
               </div>
+            </div>
+
+            {/* Remember Me & Forgot Password */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div className="form-check d-flex align-items-center gap-2 mb-0">
+                <input className="form-check-input mt-0 custom-checkbox shadow-none" type="checkbox" id="rememberMe" />
+                <label className="form-check-label text-muted" htmlFor="rememberMe" style={{ fontSize: '0.85rem' }}>
+                  Remember me
+                </label>
+              </div>
+              <a href="#" className="text-primary text-decoration-none fw-medium hover-opacity" style={{ fontSize: '0.85rem' }}>
+                Forgot Password?
+              </a>
             </div>
 
             {error && (
-              <div className="alert alert-danger border-0 py-2 small fw-medium mb-4" style={{ borderRadius: '0.5rem', backgroundColor: '#FEF2F2', color: '#B91C1C', fontSize: '0.75rem' }}>
+              <div className="alert alert-danger py-2 px-3 small rounded mb-4 border-0 bg-danger bg-opacity-10 text-danger d-flex align-items-center">
                 <i className="bi bi-exclamation-circle-fill me-2"></i>
                 {error}
               </div>
             )}
 
+            {/* Submit Button */}
             <button 
               type="submit" 
-              className="btn btn-emerald w-100 py-3 fw-bold text-white shadow-emerald rounded-pill transition-all hover-lift mb-3"
-              style={{ fontSize: '0.85rem' }}
+              className="btn btn-primary w-100 fw-medium shadow-sm transition-all submit-btn"
+              style={{ height: '48px', fontSize: '0.95rem', borderRadius: '6px' }}
               disabled={isLoading}
             >
               {isLoading ? (
-                <div className="d-flex align-items-center justify-content-center gap-2">
-                  <span className="spinner-border spinner-border-sm" role="status" style={{ width: '12px', height: '12px' }}></span>
-                  <span>Verifying Protocols...</span>
-                </div>
+                <span className="spinner-border spinner-border-sm" role="status"></span>
               ) : (
-                "AUTHENTICATE ACCESS"
+                "Log in"
               )}
             </button>
           </form>
 
-          <div className="text-center mb-4">
-            <p className="text-muted small mb-0">
-              System Initialization? <Link href="/register" className="text-primary fw-bold text-decoration-none">Create Super Admin</Link>
+          {/* Footer Text */}
+          <div className="text-center mt-4">
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+              Don't have an account? <Link href="/register" className="text-primary text-decoration-none fw-medium hover-opacity">Create an account</Link>
             </p>
           </div>
-
-          <div className="text-center pt-3 border-top">
-            <Link href="/" className="text-decoration-none text-muted fw-bold hover-text-primary transition-all" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
-              <i className="bi bi-arrow-left me-2"></i>RETURN TO MAIN INTERFACE
-            </Link>
-          </div>
         </div>
+
+        <div className="mt-auto pt-4"></div>
+      </div>
+
+      {/* Right Side: Hero Graphic with Generated Image */}
+      <div className="col-12 col-md-6 col-lg-7 d-none d-md-flex flex-column align-items-center justify-content-center p-4 p-md-5 h-100 right-panel" style={{ backgroundColor: '#0d6efd' }}>
+        
+        <div className="w-100 d-flex justify-content-center align-items-center mb-4 px-3" style={{ height: '55vh', minHeight: '350px' }}>
+          <img 
+            src="/mirai_dashboard_illustration.png" 
+            alt="Mirai Dashboard UI Illustration" 
+            className="img-fluid rounded shadow-lg"
+            style={{ 
+              maxWidth: '90%', 
+              maxHeight: '100%', 
+              objectFit: 'contain'
+            }} 
+          />
+        </div>
+
+        {/* Hero Text */}
+        <div className="text-center text-white mt-3 z-1">
+          <h3 className="fw-bold mb-3" style={{ fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)' }}>Connect with every property.</h3>
+          <p className="text-white-50 mx-auto mb-0" style={{ maxWidth: '400px', fontSize: '0.95rem', lineHeight: '1.5' }}>
+            Everything you need in an easily customizable and unified management dashboard.
+          </p>
+        </div>
+
+        {/* Carousel Dots */}
+        <div className="d-flex gap-2 mt-4 mb-2">
+          <div className="rounded-circle bg-white" style={{ width: '6px', height: '6px' }}></div>
+          <div className="rounded-circle bg-white opacity-50" style={{ width: '6px', height: '6px' }}></div>
+          <div className="rounded-circle bg-white opacity-50" style={{ width: '6px', height: '6px' }}></div>
+        </div>
+
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
-        .bg-emerald { background-color: #014aad !important; }
-        .text-primary { color: #014aad !important; }
-        .btn-emerald { background-color: #014aad; border: none; }
-        .btn-emerald:hover { background-color: #013a8a; transform: translateY(-1px); }
-        .shadow-emerald { box-shadow: 0 10px 15px -3px rgba(1, 74, 173, 0.3); }
-        .hover-lift:hover { transform: translateY(-2px); }
-        .hover-text-primary:hover { color: #014aad !important; }
-        .tracking-tight { letter-spacing: -0.02em; }
-        .input-group-text { min-width: 24px; }
-        @media (max-width: 991.98px) {
-          .min-vh-100 { overflow-y: auto !important; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        .font-sans {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .right-panel {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .custom-input-group {
+          border: 1px solid #e2e8f0;
+          transition: all 0.2s ease-in-out;
+          background-color: #fff !important;
+        }
+
+        .custom-input-group:focus-within {
+          border-color: #0d6efd;
+          box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1);
+        }
+
+        .clean-input {
+          background-color: #fff !important;
+        }
+
+        .custom-input-group .form-control:focus {
+          border-color: transparent;
+          box-shadow: none;
+        }
+
+        .custom-checkbox {
+          width: 16px;
+          height: 16px;
+          border: 1px solid #cbd5e1;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        .custom-checkbox:checked {
+          background-color: #0d6efd;
+          border-color: #0d6efd;
+        }
+
+        .submit-btn {
+          background-color: #0d6efd;
+          border-color: #0d6efd;
+        }
+
+        .submit-btn:hover {
+          background-color: #0b5ed7;
+          border-color: #0a58ca;
+        }
+
+        .hover-opacity:hover {
+          opacity: 0.8;
+        }
+
+        .form-control::placeholder {
+          color: #94a3b8;
+          opacity: 1;
+        }
+
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 30px white inset !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        /* Hide scrollbar for cleaner look if content ever overflows */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 0;
+          background: transparent;
         }
       `}} />
     </div>

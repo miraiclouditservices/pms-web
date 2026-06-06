@@ -29,7 +29,7 @@ function PropertiesContent() {
 
   useEffect(() => {
     if (searchParams.get('action') === 'add') {
-      if (!user || user.role === 'Admin' || user.role === 'Super Admin') {
+      if (!user || user.role === 'Admin' || user.role === 'SUPER_ADMIN') {
         setEditProperty(null);
         setIsModalOpen(true);
       }
@@ -250,7 +250,7 @@ function PropertiesContent() {
                 <button className="btn bg-white border d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px', borderRadius: '4px', borderColor: '#e0e0e0' }}>
                   <i className="bi bi-funnel text-dark"></i>
                 </button>
-                {(!user || user.role === 'Admin' || user.role === 'Super Admin') && (
+                {(!user || user.role === 'Admin' || user.role === 'SUPER_ADMIN') && (
                   <button
                     className="btn d-flex align-items-center justify-content-center gap-2 shadow-sm px-4"
                     onClick={openAddModal}
@@ -314,7 +314,7 @@ function PropertiesContent() {
                           <Link href={`/admin/properties/${prop._id}`} className="text-dark">
                             <i className="bi bi-eye-fill" style={{ fontSize: '1.1rem', color: '#4b5563' }}></i>
                           </Link>
-                          {(!user || user.role === 'Admin' || user.role === 'Super Admin') && (
+                          {(!user || user.role === 'Admin' || user.role === 'SUPER_ADMIN') && (
                             <button className="btn btn-link text-dark p-0" onClick={() => openEditModal(prop)}>
                               <i className="bi bi-arrow-down-circle-fill" style={{ fontSize: '1.1rem', color: '#4b5563' }}></i>
                             </button>
@@ -336,7 +336,7 @@ function PropertiesContent() {
                             Your property portfolio is currently empty.
                           </p>
                         </div>
-                        {(!user || user.role === 'Admin' || user.role === 'Super Admin') && (
+                        {(!user || user.role === 'Admin' || user.role === 'SUPER_ADMIN') && (
                           <button className="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" onClick={openAddModal}>
                             <i className="bi bi-plus-lg me-2"></i>Register Property
                           </button>

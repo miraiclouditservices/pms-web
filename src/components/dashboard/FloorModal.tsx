@@ -5,18 +5,24 @@ import { api } from "@/utils/api";
 export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
   const [properties, setProperties] = useState<any[]>([]);
   const [existingFloors, setExistingFloors] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [owners, setOwners] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     property: "",
     floorNumber: "",
     floorName: "",
     totalSft: "",
-    status: "Active"
+    status: "Active",
+    assignedAdmin: "",
+    assignedOwner: ""
   });
 
   useEffect(() => {
     if (isOpen) {
       fetchProperties();
+      fetchAdmins();
+      fetchOwners();
     }
   }, [isOpen]);
 
@@ -27,10 +33,12 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
         floorNumber: editData.floorNumber || "",
         floorName: editData.floorName || "",
         totalSft: editData.totalSft || "",
-        status: editData.status || "Active"
+        status: editData.status || "Active",
+        assignedAdmin: editData.assignedAdmin?._id || editData.assignedAdmin || "",
+        assignedOwner: editData.assignedOwner?._id || editData.assignedOwner || ""
       });
     } else {
-      setFormData({ property: "", floorNumber: "", floorName: "", totalSft: "", status: "Active" });
+      setFormData({ property: "", floorNumber: "", floorName: "", totalSft: "", status: "Active", assignedAdmin: "", assignedOwner: "" });
     }
   }, [editData, isOpen]);
 
@@ -46,6 +54,24 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
     try {
       const response = await api.get('/properties');
       if (response.success) setProperties(response.data);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchAdmins = async () => {
+    try {
+      const response = await api.get('/users/list');
+      if (response.success && response.data) {
+        setAdmins(response.data.filter((u: any) => u.role === 'FLOOR_ADMIN'));
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchOwners = async () => {
+    try {
+      const response = await api.get('/owners');
+      if (response.success && response.data) {
+        setOwners(response.data);
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -82,7 +108,13 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Clean data before sending to avoid MongoDB CastErrors
+    const submitData = { ...formData };
+    if (submitData.assignedAdmin === "") submitData.assignedAdmin = null as any;
+    if (submitData.assignedOwner === "") submitData.assignedOwner = null as any;
+    
+    onSave(submitData);
   };
 
   if (!isOpen) return null;
@@ -195,6 +227,30 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
                       <option value="Inactive">Inactive</option>
                       <option value="Maintenance">Maintenance</option>
                     </select>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small text-muted"><i className="bi bi-person-badge-fill text-primary me-2"></i>Assign Floor Admin</label>
+                    <select className="form-select border-light-subtle shadow-sm" name="assignedAdmin" value={formData.assignedAdmin} onChange={handleChange}>
+                      <option value="">-- Unassigned --</option>
+                      {admins.map(admin => (
+                        <option key={admin._id} value={admin._id}>{admin.name} ({admin.email})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small text-muted"><i className="bi bi-person-fill text-warning me-2"></i>Assign Property/Floor Owner</label>
+                    <select className="form-select border-light-subtle shadow-sm" name="assignedOwner" value={formData.assignedOwner} onChange={handleChange}>
+                      <option value="">-- Unassigned --</option>
+                      {owners.map(owner => (
+                        <option key={owner._id} value={owner._id}>{owner.ownerName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="col-12 form-text small text-muted mt-2">
+                    <i className="bi bi-info-circle me-1"></i>Assigning an Admin or Owner grants them specific management access to this floor.
                   </div>
                 </div>
               </div>

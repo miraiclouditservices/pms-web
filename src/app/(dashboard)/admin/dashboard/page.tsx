@@ -177,17 +177,17 @@ export default function DashboardPage() {
 
   // ── Role-based routing ──────────────────────────────────────────────────────
   if (!loading && user?.role) {
-    if (user.role === "Floor Admin")
+    if (user.role === "FLOOR_ADMIN")
       return <Suspense fallback={SPINNER}><FloorAdminDash user={user} /></Suspense>;
-    if (user.role === "Office Owner" || user.role === "Owner")
+    if (user.role === "OFFICE_OWNER" || user.role === "Owner")
       return <Suspense fallback={SPINNER}><OfficeOwnerDash user={user} /></Suspense>;
-    if (user.role === "Staff Admin")
+    if (user.role === "STAFF_ADMIN")
       return <Suspense fallback={SPINNER}><StaffAdminDash user={user} /></Suspense>;
     if (user.role === "Watchman" || user.role === "Security")
       return <Suspense fallback={SPINNER}><WatchmanDash user={user} /></Suspense>;
   }
 
-  const isSA = user?.role === "Super Admin" || user?.role === "Admin" || user?.role === "Staff Admin";
+  const isSA = user?.role === "SUPER_ADMIN" || user?.role === "Admin" || user?.role === "STAFF_ADMIN";
   const th: React.CSSProperties = { background: "#1e293b", color: "#fff", fontSize: "0.68rem", fontWeight: 700, padding: "10px 12px", textTransform: "uppercase", letterSpacing: "0.05em", border: "none", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { padding: "9px 12px", fontSize: "0.82rem", color: "#1e293b", borderBottom: "1px solid #f1f5f9" };
 

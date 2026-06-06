@@ -119,7 +119,7 @@ export default function BookingModal({
       if (stored) {
         try {
           const user = JSON.parse(stored);
-          setCanEditStatus(user.role === 'Super Admin' || user.role === 'Admin' || user.role === 'Floor Admin');
+          setCanEditStatus(user.role === 'SUPER_ADMIN' || user.role === 'Admin' || user.role === 'FLOOR_ADMIN');
         } catch {}
       }
     }
