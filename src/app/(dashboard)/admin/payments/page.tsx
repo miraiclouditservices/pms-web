@@ -37,12 +37,23 @@ export default function PaymentsPage() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payTxnId, setPayTxnId] = useState('');
   const [payRemarks, setPayRemarks] = useState('');
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
 
   // Submit status
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          setCurrentUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error("Failed to parse user from localStorage", e);
+        }
+      }
+    }
     fetchInitialData();
   }, []);
 
@@ -56,7 +67,13 @@ export default function PaymentsPage() {
         api.get('/auth/me')
       ]);
 
-      if (meRes.success) setCurrentUser(meRes.data);
+      if (meRes.success) {
+        const userObj = meRes.user || meRes.data;
+        setCurrentUser(userObj);
+        if (userObj) {
+          localStorage.setItem('user', JSON.stringify(userObj));
+        }
+      }
       if (leasesRes.success) setLeases(leasesRes.data || []);
       if (invoicesRes.success) setInvoices(invoicesRes.data || []);
       if (paymentsRes.success) setPayments(paymentsRes.data || []);
@@ -113,7 +130,37 @@ export default function PaymentsPage() {
     }
   };
 
-  // Record Payment
+  const handleNewPaymentClick = () => {
+    setEditingPaymentId(null);
+    if (leases.length > 0) {
+      setPayLease(leases[0]._id);
+    }
+    setPayMonth('June');
+    setPayYear(2026);
+    setPayAmount('');
+    setPayMethod('Online');
+    setPayDate(new Date().toISOString().split('T')[0]);
+    setPayTxnId('');
+    setPayRemarks('');
+    setErrorMsg('');
+    setShowPaymentModal(true);
+  };
+
+  const handleEditPaymentClick = (payment: any) => {
+    setEditingPaymentId(payment._id);
+    setPayLease(payment.lease?._id || payment.lease || '');
+    setPayMonth(payment.month);
+    setPayYear(payment.year);
+    setPayAmount(payment.amount?.toString() || '');
+    setPayMethod(payment.paymentMethod || 'Online');
+    setPayDate(payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : '');
+    setPayTxnId(payment.transactionId || '');
+    setPayRemarks(payment.remarks || '');
+    setErrorMsg('');
+    setShowPaymentModal(true);
+  };
+
+  // Record / Update Payment
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payLease || !payAmount) {
@@ -133,9 +180,17 @@ export default function PaymentsPage() {
         transactionId: payTxnId || undefined,
         remarks: payRemarks || undefined
       };
-      const res = await api.post('/payments', payload);
+      
+      let res;
+      if (editingPaymentId) {
+        res = await api.put(`/payments/${editingPaymentId}`, payload);
+      } else {
+        res = await api.post('/payments', payload);
+      }
+
       if (res.success) {
         setShowPaymentModal(false);
+        setEditingPaymentId(null);
         setPayAmount('');
         setPayTxnId('');
         setPayRemarks('');
@@ -146,7 +201,7 @@ export default function PaymentsPage() {
         if (invoicesRes.success) setInvoices(invoicesRes.data || []);
         if (paymentsRes.success) setPayments(paymentsRes.data || []);
       } else {
-        setErrorMsg(res.error || "Failed to record payment");
+        setErrorMsg(res.error || `Failed to ${editingPaymentId ? 'update' : 'record'} payment`);
       }
     } catch (err: any) {
       setErrorMsg(err.message || "An error occurred");
@@ -206,9 +261,9 @@ export default function PaymentsPage() {
     }
   };
 
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin';
-  const isFloorAdmin = currentUser?.role === 'FLOOR_ADMIN';
-  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'OFFICE_OWNER';
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin';
+  const isFloorAdmin = currentUser?.role === 'FLOOR_ADMIN' || currentUser?.role === 'Floor Admin';
+  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'OFFICE_OWNER' || currentUser?.role === 'Office Owner';
 
   if (currentUser && !isSuperAdmin && !isFloorAdmin && !isOwner) {
     return (
@@ -310,7 +365,7 @@ export default function PaymentsPage() {
           )}
           {(isSuperAdmin || isFloorAdmin) && (
             <button
-              onClick={() => { setErrorMsg(''); setShowPaymentModal(true); }}
+              onClick={handleNewPaymentClick}
               className="btn text-white d-flex align-items-center gap-2 px-3 py-2 shadow-sm fw-semibold"
               style={{ backgroundColor: '#014aad', border: 'none', borderRadius: '8px', fontSize: '0.85rem' }}
             >
@@ -573,14 +628,26 @@ export default function PaymentsPage() {
                         {p.remarks || '-'}
                       </td>
                       <td className="py-3 px-4" style={{ border: 'none' }}>
-                        {isSuperAdmin && (
-                          <button
-                            onClick={() => handleDeletePayment(p._id)}
-                            className="btn btn-link text-danger p-0 d-flex align-items-center justify-content-center"
-                          >
-                            <i className="hgi-stroke hgi-delete-02 fs-5"></i>
-                          </button>
-                        )}
+                        <div className="d-flex gap-2">
+                          {(isSuperAdmin || isFloorAdmin) && (
+                            <button
+                              onClick={() => handleEditPaymentClick(p)}
+                              className="btn btn-link text-primary p-0 d-flex align-items-center justify-content-center"
+                              title="Edit Payment"
+                            >
+                              <i className="hgi-stroke hgi-pencil fs-5"></i>
+                            </button>
+                          )}
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => handleDeletePayment(p._id)}
+                              className="btn btn-link text-danger p-0 d-flex align-items-center justify-content-center"
+                              title="Delete Payment"
+                            >
+                              <i className="hgi-stroke hgi-delete-02 fs-5"></i>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -659,13 +726,13 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {/* ==================== MODAL: RECORD NEW PAYMENT ==================== */}
+      {/* ==================== MODAL: RECORD/EDIT PAYMENT ==================== */}
       {showPaymentModal && (
         <div className="custom-modal-overlay">
           <div className="custom-modal-content" style={{ maxWidth: '550px' }}>
             <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
-              <h5 className="fw-bold mb-0 text-dark">Record Payment Record</h5>
-              <button onClick={() => setShowPaymentModal(false)} className="btn-close" style={{ outline: 'none', boxShadow: 'none' }}></button>
+              <h5 className="fw-bold mb-0 text-dark">{editingPaymentId ? 'Edit Payment Record' : 'Record Payment Record'}</h5>
+              <button onClick={() => { setShowPaymentModal(false); setEditingPaymentId(null); }} className="btn-close" style={{ outline: 'none', boxShadow: 'none' }}></button>
             </div>
             <form onSubmit={handleRecordPayment}>
               <div className="p-4" style={{ maxHeight: '450px', overflowY: 'auto' }}>
@@ -782,7 +849,7 @@ export default function PaymentsPage() {
               <div className="p-4 bg-light d-flex justify-content-end gap-2 border-top">
                 <button
                   type="button"
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={() => { setShowPaymentModal(false); setEditingPaymentId(null); }}
                   className="btn btn-outline-secondary px-4 fw-semibold"
                   style={{ borderRadius: '8px', fontSize: '0.85rem' }}
                 >
@@ -794,7 +861,7 @@ export default function PaymentsPage() {
                   className="btn text-white px-4 fw-semibold"
                   style={{ backgroundColor: '#014aad', borderRadius: '8px', fontSize: '0.85rem' }}
                 >
-                  {isSubmitting ? 'Recording...' : 'Submit Payment'}
+                  {isSubmitting ? (editingPaymentId ? 'Updating...' : 'Recording...') : (editingPaymentId ? 'Update Payment' : 'Submit Payment')}
                 </button>
               </div>
             </form>

@@ -13,9 +13,13 @@ export default function UsersPage() {
   const [viewUser, setViewUser] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState('Overview');
   const [showPassword, setShowPassword] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Billing and invoice history states
-  const [billingData, setBillingData] = useState<any>(null);
+  // Agreement & payment data states
+  const [agreementData, setAgreementData] = useState<any>(null);  // { agreements: [], summary: {} }
+  const [loadingAgreement, setLoadingAgreement] = useState(false);
+  const [billingData, setBillingData] = useState<any>(null);  // { invoices: [], summary: {} }
   const [loadingBilling, setLoadingBilling] = useState(false);
 
   // Edit and Quick Action states
@@ -24,6 +28,16 @@ export default function UsersPage() {
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedAgreement, setSelectedAgreement] = useState<any>(null);
+  const [paymentModeInput, setPaymentModeInput] = useState('UPI');
+  const [transactionRefInput, setTransactionRefInput] = useState('');
+  const [notesInput, setNotesInput] = useState('');
+  const [paymentAmountInput, setPaymentAmountInput] = useState('');
+  const [paymentDateInput, setPaymentDateInput] = useState(new Date().toISOString().split('T')[0]);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Global lists for mapping
   const [properties, setProperties] = useState<any[]>([]);
@@ -37,14 +51,21 @@ export default function UsersPage() {
     fetchUnits();
   }, []);
 
-  // Sync details when user changes or gets updated
+  // Sync agreement & billing data when viewed user changes
   useEffect(() => {
     if (viewUser) {
+      fetchAgreementData(viewUser._id);
       fetchBillingData(viewUser._id);
     } else {
+      setAgreementData(null);
       setBillingData(null);
     }
   }, [viewUser]);
+
+  // Reset pagination to page 1 when filter or query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter]);
 
   const fetchUsers = async () => {
     try {
@@ -83,31 +104,31 @@ export default function UsersPage() {
     } catch (err) { console.error(err); }
   };
 
+  const fetchAgreementData = async (userId: string) => {
+    try {
+      setLoadingAgreement(true);
+      const res = await api.get(`/agreements/user/${userId}`);
+      if (res.success) {
+        setAgreementData(res.data); // { agreements: [], summary: {} }
+      }
+    } catch (err) {
+      console.error('Error fetching agreement data:', err);
+    } finally {
+      setLoadingAgreement(false);
+    }
+  };
+
   const fetchBillingData = async (userId: string) => {
     try {
       setLoadingBilling(true);
       const res = await api.get(`/users/${userId}/billing`);
       if (res.success) {
-        setBillingData(res.data);
+        setBillingData(res.data); // { invoices: [], summary: {} }
       }
     } catch (err) {
-      console.error('Error fetching billing info:', err);
+      console.error('Error fetching billing data:', err);
     } finally {
       setLoadingBilling(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to revoke system access for this user?")) {
-      try {
-        await api.delete(`/users/${id}`);
-        fetchUsers();
-        if (viewUser && viewUser._id === id) {
-          setViewUser(null);
-        }
-      } catch (err) {
-        console.error(err);
-      }
     }
   };
 
@@ -132,6 +153,38 @@ export default function UsersPage() {
       } finally {
         setIsSubmittingAction(false);
       }
+    }
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAgreement || !viewUser) return;
+    const amt = Number(paymentAmountInput);
+    if (!amt || amt <= 0) return alert('Enter a valid amount');
+    try {
+      setIsSubmittingPayment(true);
+      const res = await api.post(`/agreements/${selectedAgreement._id}/payments`, {
+        amountPaid: amt,
+        paymentDate: paymentDateInput || new Date().toISOString(),
+        paymentMode: paymentModeInput,
+        transactionRef: transactionRefInput || undefined,
+        notes: notesInput || 'Recorded via admin portal'
+      });
+      if (res.success) {
+        alert(`Payment of ₹${amt.toLocaleString()} recorded! Receipt: ${res.data?.payment?.receiptNumber || 'N/A'}`);
+        setShowPaymentModal(false);
+        setSelectedAgreement(null);
+        setTransactionRefInput('');
+        setNotesInput('');
+        setPaymentAmountInput('');
+        setPaymentDateInput(new Date().toISOString().split('T')[0]);
+        fetchAgreementData(viewUser._id);
+        fetchUsers();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to record payment');
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -184,10 +237,12 @@ export default function UsersPage() {
       address: viewUser.address || '',
       agreementStatus: viewUser.agreementStatus || 'Active',
       monthlyManagementAmount: viewUser.monthlyManagementAmount || 0,
-      paymentType: viewUser.paymentType || 'Monthly',
+      totalAgreementAmount: viewUser.totalAgreementAmount || 0,
+      paymentType: viewUser.paymentType || 'Monthly Installment',
       paymentDueDay: viewUser.paymentDueDay || 5,
       floorAssignmentStartDate: viewUser.floorAssignmentStartDate ? viewUser.floorAssignmentStartDate.split('T')[0] : '',
-      floorAssignmentEndDate: viewUser.floorAssignmentEndDate ? viewUser.floorAssignmentEndDate.split('T')[0] : ''
+      floorAssignmentEndDate: viewUser.floorAssignmentEndDate ? viewUser.floorAssignmentEndDate.split('T')[0] : '',
+      role: viewUser.role
     });
     setIsEditingUser(true);
   };
@@ -220,6 +275,12 @@ export default function UsersPage() {
     const matchesRole = roleFilter === 'All Roles' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  const totalItems = filteredUsers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
 
   // Dynamic mapped names
   const getPropertyNames = (propIds: string[] = []) => {
@@ -275,7 +336,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-0 p-md-0" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'var(--font-geist-sans)' }}>
+    <div className="p-0" style={{ backgroundColor: '#ffffff', minHeight: '100vh', fontFamily: 'var(--font-geist-sans)' }}>
       <style jsx global>{`
         .text-purple { color: #8b5cf6 !important; }
         .border-purple { border-color: #8b5cf6 !important; }
@@ -440,7 +501,7 @@ export default function UsersPage() {
 
       {!viewUser ? (
         /* ======================== 1. USERS LIST COMPONENT ======================== */
-        <div className="bg-white border-2 d-flex flex-column" style={{ borderRadius: '8px', padding: '10px 10px', border: '1px solid #e0e0e0', height: 'calc(100vh - 20px)', margin: '10px' }}>
+        <div className="bg-white d-flex flex-column" style={{ height: '100vh', margin: '0px', padding: '0px' }}>
           
           {/* Header & Filter Bar Merged */}
           <div className="d-flex justify-content-between align-items-center mb-3 pb-2 pt-0 flex-shrink-0" style={{ backgroundColor: '#ffffff' }}>
@@ -506,11 +567,11 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user, index) => (
+              {currentItems.length > 0 ? (
+                currentItems.map((user, index) => (
                   <tr key={user._id} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                     <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
-                      {String(index + 1).padStart(3, '0')}
+                      {String(indexOfFirstItem + index + 1).padStart(3, '0')}
                     </td>
                     <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
                       <div className="d-flex align-items-center gap-3">
@@ -549,13 +610,7 @@ export default function UsersPage() {
                         >
                           <i className="hgi-stroke hgi-view"></i>
                         </button>
-                        <button 
-                          className="action-btn action-btn-revoke text-danger" 
-                          title="Revoke System Access"
-                          onClick={() => handleDelete(user._id)}
-                        >
-                          <i className="hgi-stroke hgi-user-block"></i>
-                        </button>
+
                       </div>
                     </td>
                   </tr>
@@ -579,6 +634,44 @@ export default function UsersPage() {
               )}
               </tbody>
             </table>
+          </div>
+
+          {/* ── Pagination Footer ───────────────────────────────────────────── */}
+          <div className="px-4 py-3 border-top d-flex justify-content-between align-items-center bg-white flex-shrink-0">
+            <span className="text-muted small">
+              Showing {totalItems > 0 ? indexOfFirstItem + 1 : 0}–{Math.min(indexOfLastItem, totalItems)} of {totalItems} entries
+            </span>
+            <div className="d-flex gap-1 align-items-center">
+              <button 
+                className="btn btn-sm btn-light border px-2 shadow-none" 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`btn btn-sm px-3 shadow-none fw-bold ${currentPage === page ? 'text-white' : 'text-dark border-0 bg-transparent'}`}
+                  style={{ 
+                    backgroundColor: currentPage === page ? '#014aad' : 'transparent', 
+                    borderRadius: '6px' 
+                  }}
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button 
+                className="btn btn-sm btn-light border px-2 shadow-none" 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -634,11 +727,7 @@ export default function UsersPage() {
                       <i className="hgi-stroke hgi-user-block me-2"></i> {viewUser.agreementStatus === 'Suspended' ? 'Activate Account' : 'Suspend Account'}
                     </button>
                   </li>
-                  <li>
-                    <button className="dropdown-item py-2 rounded text-danger" onClick={() => handleDelete(viewUser._id)}>
-                      <i className="hgi-stroke hgi-delete-02 me-2"></i> Revoke System Access
-                    </button>
-                  </li>
+
                 </ul>
               </div>
             </div>
@@ -1051,12 +1140,346 @@ export default function UsersPage() {
             </div>
           )}
 
-          {/* Placeholders for Other Tabs */}
-          {activeTab !== 'Overview' && (
-            <div className="bg-white border rounded-4 p-5 text-center text-muted">
-              <i className="hgi-stroke hgi-folder-open fs-1 text-muted mb-3 d-block"></i>
-              <h5 className="fw-bold text-dark mb-1">{activeTab} Section</h5>
-              <p className="small mb-0">Detailed list logs, spatial telemetry, and configurations relating to {activeTab} logs will populate here.</p>
+          {/* ======================== 2.1 AGREEMENT DETAILS TAB ======================== */}
+          {activeTab === 'Agreement Details' && (
+            <div className="text-start">
+              {loadingAgreement ? (
+                <div className="text-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2"></span>Loading agreement data...</div>
+              ) : !agreementData?.agreements?.length ? (
+                <div className="detail-card text-center py-5">
+                  <i className="hgi-stroke hgi-agreement d-block fs-1 text-muted mb-3 opacity-50"></i>
+                  <h6 className="fw-bold text-dark">No Agreements Found</h6>
+                  <p className="text-muted small">No agreement has been created for this user yet.</p>
+                </div>
+              ) : agreementData.agreements.map((agr: any) => (
+                <div key={agr._id} className="mb-4">
+                  {/* Agreement header badge */}
+                  <div className="d-flex align-items-center gap-3 mb-3">
+                    <span className="fw-bold text-primary" style={{ fontSize: '0.9rem' }}>{agr.agreementNumber}</span>
+                    <span className={`badge rounded-pill px-3 py-1 ${
+                      agr.status === 'Paid' ? 'bg-success bg-opacity-10 text-success' :
+                      agr.status === 'Partially Paid' ? 'bg-info bg-opacity-10 text-info' :
+                      agr.status === 'Overdue' || agr.status === 'Expired' ? 'bg-danger bg-opacity-10 text-danger' :
+                      'bg-warning bg-opacity-10 text-warning'
+                    }`} style={{ fontSize: '0.75rem', fontWeight: 700 }}>{agr.status}</span>
+                  </div>
+
+                  <div className="row g-4">
+                    {/* Left: Core Agreement */}
+                    <div className="col-lg-6 col-md-12">
+                      <div className="detail-card h-100">
+                        <div className="detail-card-header">
+                          <div className="d-flex align-items-center gap-2">
+                            <i className="hgi-stroke hgi-agreement text-primary fs-5"></i>
+                            <h5 className="fw-bold mb-0 text-dark">Agreement Configuration</h5>
+                          </div>
+                        </div>
+                        <div className="row">
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">Company / Entity Name</div>
+                            <div className="detail-grid-value fw-bold text-dark">{agr.companyName || viewUser.companyName || 'Individual'}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">Tenant Type</div>
+                            <div className="detail-grid-value text-capitalize">{agr.tenantType || viewUser.tenantType || 'Individual'}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">GST / PAN Number</div>
+                            <div className="detail-grid-value text-uppercase fw-semibold">{agr.gstPan || viewUser.gstPan || '—'}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">Payment Type</div>
+                            <div className="detail-grid-value fw-semibold text-primary">{agr.paymentType}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">Start Date</div>
+                            <div className="detail-grid-value text-dark fw-semibold">{agr.startDate ? new Date(agr.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">End Date</div>
+                            <div className="detail-grid-value text-dark fw-semibold">{agr.endDate ? new Date(agr.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">Contract Duration</div>
+                            <div className="detail-grid-value text-dark">{agr.startDate && agr.endDate ? getAgreementDuration(agr.startDate, agr.endDate) : '—'}</div>
+                          </div>
+                          <div className="col-md-6 detail-grid-item">
+                            <div className="detail-grid-label">Payment Due Day</div>
+                            <div className="detail-grid-value text-dark">Day {agr.paymentDueDay || 5} of every month</div>
+                          </div>
+                          {agr.remarks && (
+                            <div className="col-md-12 detail-grid-item">
+                              <div className="detail-grid-label">Remarks</div>
+                              <div className="detail-grid-value text-muted small">{agr.remarks}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Financial Summary */}
+                    <div className="col-lg-6 col-md-12">
+                      <div className="detail-card h-100">
+                        <div className="detail-card-header">
+                          <div className="d-flex align-items-center gap-2">
+                            <i className="hgi-stroke hgi-wallet-01 text-success fs-5"></i>
+                            <h5 className="fw-bold mb-0 text-dark">Financial Summary</h5>
+                          </div>
+                        </div>
+                        <div className="d-flex flex-column gap-3 mt-1">
+                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Total Agreement Amount</span>
+                            <strong className="text-dark" style={{ fontSize: '1.05rem' }}>₹ {agr.totalAmount?.toLocaleString() || 0}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Installment Amount</span>
+                            <strong className="text-primary" style={{ fontSize: '1rem' }}>₹ {agr.installmentAmount?.toLocaleString() || 0}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Total Paid</span>
+                            <strong className="text-success" style={{ fontSize: '1rem' }}>₹ {agr.totalPaid?.toLocaleString() || 0}</strong>
+                          </div>
+                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
+                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Pending Balance</span>
+                            <strong className="text-danger" style={{ fontSize: '1.1rem' }}>₹ {agr.pendingAmount?.toLocaleString() || 0}</strong>
+                          </div>
+                          {agr.nextDueDate && (
+                            <div className="d-flex justify-content-between align-items-center py-2">
+                              <span className="text-muted" style={{ fontSize: '0.9rem' }}>Next Due Date</span>
+                              <strong className="text-warning" style={{ fontSize: '0.95rem' }}>{new Date(agr.nextDueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+                            </div>
+                          )}
+                        </div>
+                        {/* Progress bar */}
+                        <div className="mt-3">
+                          <div className="d-flex justify-content-between small text-muted mb-1">
+                            <span>Payment Progress</span>
+                            <span>{agr.totalAmount > 0 ? Math.round((agr.totalPaid / agr.totalAmount) * 100) : 0}% Cleared</span>
+                          </div>
+                          <div className="progress" style={{ height: '8px', borderRadius: '99px' }}>
+                            <div className="progress-bar bg-success" style={{ width: `${agr.totalAmount > 0 ? Math.min(100, Math.round((agr.totalPaid / agr.totalAmount) * 100)) : 0}%`, borderRadius: '99px' }}></div>
+                          </div>
+                        </div>
+                        {/* Pay Now CTA */}
+                        {agr.pendingAmount > 0 && (
+                          <button className="btn btn-primary w-100 mt-3 fw-bold rounded-3" onClick={() => { setSelectedAgreement(agr); setPaymentAmountInput(String(agr.installmentAmount || agr.pendingAmount)); setShowPaymentModal(true); }}>
+                            <i className="hgi-stroke hgi-wallet-01 me-2"></i>Record Payment  —  ₹{(agr.installmentAmount || agr.pendingAmount).toLocaleString()} Due
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ======================== 2.2 PAYMENTS TAB ======================== */}
+          {activeTab === 'Payments' && (
+            <div className="text-start">
+              {/* Summary Cards */}
+              {agreementData?.summary && (
+                <div className="row g-3 mb-4">
+                  {[
+                    { label: 'Total Agreement', value: agreementData.summary.totalAmount, color: 'text-dark', icon: 'hgi-invoice' },
+                    { label: 'Total Paid', value: agreementData.summary.totalPaid, color: 'text-success', icon: 'hgi-checkmark-circle-02' },
+                    { label: 'Pending Balance', value: agreementData.summary.totalPending, color: 'text-danger', icon: 'hgi-alert-02' },
+                    { label: 'Active Agreements', value: agreementData.summary.activeCount, color: 'text-primary', icon: 'hgi-agreement', isCount: true }
+                  ].map((s, i) => (
+                    <div key={i} className="col-6 col-md-3">
+                      <div className="detail-card py-3 px-3">
+                        <i className={`hgi-stroke ${s.icon} ${s.color} fs-4 mb-2 d-block`}></i>
+                        <div className={`fw-bold ${s.color}`} style={{ fontSize: '1.2rem' }}>{s.isCount ? s.value : `₹ ${(s.value || 0).toLocaleString()}`}</div>
+                        <div className="text-muted small">{s.label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {loadingAgreement ? (
+                <div className="text-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2"></span>Loading payment history...</div>
+              ) : !agreementData?.agreements?.length ? (
+                <div className="detail-card text-center py-5">
+                  <i className="hgi-stroke hgi-folder-open d-block fs-1 text-muted mb-3 opacity-50"></i>
+                  <h6 className="fw-bold text-dark">No Payment Records</h6>
+                  <p className="text-muted small">No agreement exists for this user. Create an agreement first.</p>
+                </div>
+              ) : agreementData.agreements.map((agr: any) => (
+                <div key={agr._id} className="detail-card mb-4">
+                  <div className="detail-card-header">
+                    <div>
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="hgi-stroke hgi-invoice text-primary fs-5"></i>
+                        <h5 className="fw-bold mb-0 text-dark">Payment History — {agr.agreementNumber}</h5>
+                      </div>
+                      <div className="text-muted small mt-1">{agr.paymentType} · Total: ₹{agr.totalAmount?.toLocaleString()} · Pending: <span className="text-danger fw-bold">₹{agr.pendingAmount?.toLocaleString()}</span></div>
+                    </div>
+                    {agr.pendingAmount > 0 && (
+                      <button className="btn btn-primary btn-sm px-4 fw-bold rounded-pill" onClick={() => { setSelectedAgreement(agr); setPaymentAmountInput(String(agr.installmentAmount || agr.pendingAmount)); setShowPaymentModal(true); }}>
+                        + Record Payment
+                      </button>
+                    )}
+                  </div>
+
+                  {agr.payments?.length > 0 ? (
+                    <div className="table-responsive">
+                      <table className="table mb-0 border-0">
+                        <thead>
+                          <tr>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Receipt No.</th>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Payment Date</th>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Amount Paid</th>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Mode</th>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Reference</th>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Notes</th>
+                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {agr.payments.map((p: any) => (
+                            <tr key={p._id}>
+                              <td className="py-3 fw-bold text-dark" style={{ fontSize: '0.82rem' }}>{p.receiptNumber || '—'}</td>
+                              <td className="py-3 text-muted" style={{ fontSize: '0.82rem' }}>{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                              <td className="py-3 fw-bold text-success" style={{ fontSize: '0.9rem' }}>₹ {(p.amountPaid || p.amount || 0).toLocaleString()}</td>
+                              <td className="py-3 text-muted" style={{ fontSize: '0.82rem' }}>{p.paymentMode || '—'}</td>
+                              <td className="py-3 text-muted text-truncate" style={{ fontSize: '0.8rem', maxWidth: '130px' }} title={p.transactionRef}>{p.transactionRef || '—'}</td>
+                              <td className="py-3 text-muted" style={{ fontSize: '0.8rem', maxWidth: '160px' }}>{p.notes || '—'}</td>
+                              <td className="py-3">
+                                <span className={`badge rounded-pill px-3 py-1 ${p.status === 'Confirmed' ? 'bg-success bg-opacity-10 text-success' : 'bg-warning bg-opacity-10 text-warning'}`} style={{ fontSize: '0.72rem', fontWeight: 700 }}>{p.status || 'Confirmed'}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted">
+                      <i className="hgi-stroke hgi-folder-open d-block fs-2 mb-2 opacity-40"></i>
+                      <span className="small">No payments recorded yet for this agreement.</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ======================== 2.3 ACTIVITY LOG TAB ======================== */}
+          {activeTab === 'Activity Log' && (
+            <div className="detail-card text-start">
+              <div className="detail-card-header">
+                <div className="d-flex align-items-center gap-2">
+                  <i className="hgi-stroke hgi-activity-01 text-primary fs-5"></i>
+                  <h5 className="fw-bold mb-0 text-dark">Audit Trails & Activity Log</h5>
+                </div>
+              </div>
+              <div className="px-3 py-2">
+                <div className="timeline-container position-relative py-3">
+                  <div className="timeline-line position-absolute" style={{ left: '19px', top: '0', bottom: '0', width: '2px', backgroundColor: '#e2e8f0', zIndex: 1 }}></div>
+
+                  {/* Account creation event */}
+                  <div className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
+                    <div className="timeline-icon bg-success rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
+                      <i className="hgi-stroke hgi-user-add-01" style={{ fontSize: '0.85rem' }}></i>
+                    </div>
+                    <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
+                      <div className="d-flex justify-content-between align-items-start mb-1">
+                        <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Account Provisioned & Activated</h6>
+                        <span className="text-muted small flex-shrink-0 ms-3">{viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                      </div>
+                      <p className="text-muted small mb-0">System access granted for <strong>{viewUser.name}</strong> with role <span className="badge bg-primary bg-opacity-10 text-primary px-2 py-1">{viewUser.role}</span>.</p>
+                    </div>
+                  </div>
+
+                  {/* Spatial assignment events */}
+                  {viewUser.assignedFloors?.length > 0 && (
+                    <div className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
+                      <div className="timeline-icon bg-primary rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
+                        <i className="hgi-stroke hgi-building-03" style={{ fontSize: '0.85rem' }}></i>
+                      </div>
+                      <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
+                        <div className="d-flex justify-content-between align-items-start mb-1">
+                          <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Spatial Mappings Synchronized</h6>
+                          <span className="text-muted small flex-shrink-0 ms-3">{viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString('en-GB') : '—'}</span>
+                        </div>
+                        <p className="text-muted small mb-0">Linked to <strong>{viewUser.assignedFloors.length} floor(s)</strong> and <strong>{viewUser.assignedUnits?.length || 0} unit(s)</strong>.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Agreement events (real data) */}
+                  {agreementData?.agreements?.map((agr: any) => (
+                    <div key={agr._id} className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
+                      <div className="timeline-icon bg-info rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
+                        <i className="hgi-stroke hgi-agreement" style={{ fontSize: '0.85rem' }}></i>
+                      </div>
+                      <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
+                        <div className="d-flex justify-content-between align-items-start mb-1">
+                          <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Agreement Created — {agr.agreementNumber}</h6>
+                          <span className="text-muted small flex-shrink-0 ms-3">{agr.createdAt ? new Date(agr.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                        </div>
+                        <p className="text-muted small mb-0"><strong>{agr.paymentType}</strong> agreement for ₹{agr.totalAmount?.toLocaleString()} from {agr.startDate ? new Date(agr.startDate).toLocaleDateString('en-GB') : '?'} to {agr.endDate ? new Date(agr.endDate).toLocaleDateString('en-GB') : '?'}. Current status: <span className="fw-bold">{agr.status}</span>.</p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Payment events (real data) */}
+                  {agreementData?.agreements?.flatMap((agr: any) => agr.payments || []).sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()).map((p: any) => (
+                    <div key={p._id} className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
+                      <div className="timeline-icon bg-purple rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
+                        <i className="hgi-stroke hgi-wallet-01" style={{ fontSize: '0.85rem' }}></i>
+                      </div>
+                      <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
+                        <div className="d-flex justify-content-between align-items-start mb-1">
+                          <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Payment Recorded — {p.receiptNumber || 'N/A'}</h6>
+                          <span className="text-muted small flex-shrink-0 ms-3">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                        </div>
+                        <p className="text-muted small mb-0">₹{(p.amountPaid || p.amount || 0).toLocaleString()} paid via <strong>{p.paymentMode}</strong>{p.transactionRef ? ` · Ref: ${p.transactionRef}` : ''}. {p.notes || ''}</p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {!agreementData?.agreements?.length && (
+                    <div className="text-center text-muted small py-3">No agreement or payment activity recorded yet.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================== 2.4 PERMISSIONS TAB ======================== */}
+          {activeTab === 'Permissions' && (
+            <div className="detail-card text-start">
+              <div className="detail-card-header">
+                <div className="d-flex align-items-center gap-2">
+                  <i className="hgi-stroke hgi-shield-lock text-primary fs-5"></i>
+                  <h5 className="fw-bold mb-0 text-dark">Role Clearances & Permissions</h5>
+                </div>
+              </div>
+              <div className="row g-3 p-2">
+                {[
+                  { name: 'System Login', desc: 'Authenticate into the admin portal.', active: true },
+                  { name: 'Provision Accounts', desc: 'Create and provision subordinate user accounts.', active: viewUser.role === 'SUPER_ADMIN' },
+                  { name: 'Financial Control', desc: 'Generate invoices and record maintenance payments.', active: ['SUPER_ADMIN', 'OFFICE_OWNER'].includes(viewUser.role) },
+                  { name: 'Helpdesk & AMC Response', desc: 'Resolve complaints and coordinate maintenance.', active: ['SUPER_ADMIN', 'FLOOR_ADMIN', 'STAFF_ADMIN'].includes(viewUser.role) },
+                  { name: 'Visitor Approval', desc: 'Approve gate passes and view visitor logs.', active: true },
+                  { name: 'Spatial Config', desc: 'Add properties, floors, and units to the database.', active: viewUser.role === 'SUPER_ADMIN' },
+                  { name: 'Agreement Management', desc: 'Create and manage tenant agreements.', active: ['SUPER_ADMIN', 'FLOOR_ADMIN'].includes(viewUser.role) },
+                  { name: 'Reports Access', desc: 'View collection and due management reports.', active: ['SUPER_ADMIN', 'FLOOR_ADMIN'].includes(viewUser.role) }
+                ].map((perm, idx) => (
+                  <div key={idx} className="col-md-6">
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 border">
+                      <div>
+                        <h6 className="fw-bold text-dark mb-1" style={{ fontSize: '0.85rem' }}>{perm.name}</h6>
+                        <p className="text-muted small mb-0" style={{ fontSize: '0.75rem', maxWidth: '260px' }}>{perm.desc}</p>
+                      </div>
+                      <span className={`badge rounded-pill px-3 py-1 flex-shrink-0 ms-2 ${perm.active ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary'}`} style={{ fontSize: '0.7rem', fontWeight: 700 }}>
+                        {perm.active ? 'Authorized' : 'Restricted'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1143,28 +1566,60 @@ export default function UsersPage() {
                       </select>
                     </div>
 
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Monthly Management Amount</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        value={editForm.monthlyManagementAmount} 
-                        onChange={e => setEditForm({ ...editForm, monthlyManagementAmount: Number(e.target.value) })}
-                      />
-                    </div>
+                    {editForm.role === 'OFFICE_OWNER' || editForm.role === 'Owner' ? (
+                      <>
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold small text-muted">Total Agreement Amount</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            value={editForm.totalAgreementAmount} 
+                            onChange={e => setEditForm({ ...editForm, totalAgreementAmount: Number(e.target.value) })}
+                          />
+                        </div>
 
-                    <div className="col-md-4">
-                      <label className="form-label fw-semibold small text-muted">Payment Type</label>
-                      <select 
-                        className="form-select" 
-                        value={editForm.paymentType}
-                        onChange={e => setEditForm({ ...editForm, paymentType: e.target.value })}
-                      >
-                        <option value="Monthly">Monthly</option>
-                        <option value="Quarterly">Quarterly</option>
-                        <option value="Yearly">Yearly</option>
-                      </select>
-                    </div>
+                        <div className="col-md-4">
+                          <label className="form-label fw-semibold small text-muted">Payment Type</label>
+                          <select 
+                            className="form-select" 
+                            value={editForm.paymentType}
+                            onChange={e => setEditForm({ ...editForm, paymentType: e.target.value })}
+                          >
+                            <option value="One Time">One Time</option>
+                            <option value="Monthly Installment">Monthly Installment</option>
+                            <option value="Quarterly Installment">Quarterly Installment</option>
+                            <option value="Half-Yearly Installment">Half-Yearly Installment</option>
+                            <option value="Yearly Installment">Yearly Installment</option>
+                            <option value="Custom Installment">Custom Installment</option>
+                          </select>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-md-6">
+                          <label className="form-label fw-semibold small text-muted">Monthly Management Amount</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            value={editForm.monthlyManagementAmount} 
+                            onChange={e => setEditForm({ ...editForm, monthlyManagementAmount: Number(e.target.value) })}
+                          />
+                        </div>
+
+                        <div className="col-md-4">
+                          <label className="form-label fw-semibold small text-muted">Payment Type</label>
+                          <select 
+                            className="form-select" 
+                            value={editForm.paymentType}
+                            onChange={e => setEditForm({ ...editForm, paymentType: e.target.value })}
+                          >
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Yearly">Yearly</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
 
                     <div className="col-md-4">
                       <label className="form-label fw-semibold small text-muted">Payment Due Day</label>
@@ -1247,6 +1702,90 @@ export default function UsersPage() {
                   <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={() => setShowResetPasswordModal(false)}>Cancel</button>
                   <button type="submit" className="btn btn-primary rounded-pill px-4" disabled={isSubmittingAction}>
                     {isSubmittingAction ? 'Resetting...' : 'Update Password'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================== 5. RECORD PAYMENT MODAL ======================== */}
+      {showPaymentModal && selectedAgreement && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.72)', zIndex: 1200, backdropFilter: 'blur(10px)' }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '540px' }}>
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
+              {/* Header */}
+              <div className="modal-header border-0 px-4 py-3 d-flex align-items-center justify-content-between" style={{ background: 'linear-gradient(135deg, #014aad 0%, #0266e8 100%)' }}>
+                <div className="d-flex align-items-center gap-2 text-white">
+                  <i className="hgi-stroke hgi-wallet-01 fs-5"></i>
+                  <h5 className="fw-bold mb-0">Record Payment</h5>
+                </div>
+                <button type="button" className="btn-close btn-close-white" onClick={() => { setShowPaymentModal(false); setSelectedAgreement(null); }}></button>
+              </div>
+
+              {/* Agreement Summary Banner */}
+              <div className="px-4 py-3" style={{ backgroundColor: '#f0f7ff', borderBottom: '1px solid #dbeafe' }}>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="text-muted small fw-semibold">AGREEMENT</div>
+                    <div className="fw-bold text-dark">{selectedAgreement.agreementNumber}</div>
+                    <div className="text-muted small">{selectedAgreement.paymentType} · ₹{selectedAgreement.installmentAmount?.toLocaleString()} per installment</div>
+                  </div>
+                  <div className="text-end">
+                    <div className="text-muted small fw-semibold">PENDING BALANCE</div>
+                    <div className="fw-bold text-danger" style={{ fontSize: '1.4rem' }}>₹ {selectedAgreement.pendingAmount?.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handlePaymentSubmit}>
+                <div className="modal-body p-4">
+                  <div className="row g-3">
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Amount Paying (₹) *</label>
+                      <div className="input-group">
+                        <span className="input-group-text bg-light border-end-0 fw-bold text-muted">₹</span>
+                        <input type="number" className="form-control border-start-0" placeholder={String(selectedAgreement.installmentAmount || selectedAgreement.pendingAmount)} value={paymentAmountInput} onChange={e => setPaymentAmountInput(e.target.value)} required min="1" max={selectedAgreement.pendingAmount} />
+                      </div>
+                      <div className="form-text text-muted" style={{ fontSize: '0.73rem' }}>Max: ₹{selectedAgreement.pendingAmount?.toLocaleString()}</div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Payment Date *</label>
+                      <input type="date" className="form-control" value={paymentDateInput} onChange={e => setPaymentDateInput(e.target.value)} required max={new Date().toISOString().split('T')[0]} />
+                    </div>
+
+                    <div className="col-12">
+                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Payment Mode *</label>
+                      <div className="d-flex flex-wrap gap-2">
+                        {['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'].map(mode => (
+                          <button key={mode} type="button" className={`btn btn-sm px-3 py-2 rounded-pill fw-semibold ${paymentModeInput === mode ? 'btn-primary shadow-sm' : 'btn-outline-secondary'}`} style={{ fontSize: '0.8rem' }} onClick={() => setPaymentModeInput(mode)}>
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="col-12">
+                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Transaction / Reference No.</label>
+                      <input type="text" className="form-control" placeholder="e.g. UTR123456789, CHQ-00421" value={transactionRefInput} onChange={e => setTransactionRefInput(e.target.value)} />
+                      <div className="form-text text-muted" style={{ fontSize: '0.73rem' }}>Auto-generated receipt if left blank.</div>
+                    </div>
+
+                    <div className="col-12">
+                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Notes / Remarks</label>
+                      <textarea className="form-control" rows={2} placeholder="e.g. Paid via NEFT, partial payment for June" value={notesInput} onChange={e => setNotesInput(e.target.value)} />
+                    </div>
+
+                  </div>
+                </div>
+
+                <div className="modal-footer border-0 px-4 py-3 bg-light d-flex justify-content-end gap-2">
+                  <button type="button" className="btn btn-outline-secondary rounded-pill px-4" onClick={() => { setShowPaymentModal(false); setSelectedAgreement(null); }}>Cancel</button>
+                  <button type="submit" className="btn btn-primary rounded-pill px-4 fw-bold d-flex align-items-center gap-2" disabled={isSubmittingPayment}>
+                    {isSubmittingPayment ? (<><span className="spinner-border spinner-border-sm"></span> Recording...</>) : (<><i className="hgi-stroke hgi-checkmark-circle-02"></i> Confirm Payment</>)}
                   </button>
                 </div>
               </form>

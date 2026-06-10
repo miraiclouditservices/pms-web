@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/utils/api";
@@ -11,7 +11,33 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
   const router = useRouter();
+
+  const slides = [
+    {
+      image: "/mirai_dashboard_illustration.png",
+      title: "Connect with every property.",
+      description: "Everything you need in an easily customizable and unified management dashboard."
+    },
+    {
+      image: "/mirai_property_image.png",
+      title: "Manage properties seamlessly.",
+      description: "Track and organize your commercial and residential spaces from a single location."
+    },
+    {
+      image: "/mirai_office_image.png",
+      title: "Optimize your office operations.",
+      description: "Streamline workflows, rent tracking, payments, and staff roles with modern, secure controls."
+    }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,9 +77,11 @@ export default function LoginPage() {
         {/* Brand Logo */}
         <div className="mb-auto pb-4">
           <div className="d-flex align-items-center gap-2">
-            <div className="bg-primary text-white rounded d-flex align-items-center justify-content-center shadow-sm" style={{ width: '32px', height: '32px' }}>
-              <i className="bi bi-clouds-fill fs-5"></i>
-            </div>
+            <img 
+              src="/mirai_logo.png" 
+              alt="Mirai Logo" 
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
+            />
             <span className="fw-bold fs-5 text-primary" style={{ letterSpacing: '-0.02em' }}>Mirai Cloud</span>
           </div>
         </div>
@@ -154,35 +182,72 @@ export default function LoginPage() {
         <div className="mt-auto pt-4"></div>
       </div>
 
-      {/* Right Side: Hero Graphic with Generated Image */}
+      {/* Right Side: Hero Graphic with Carousel */}
       <div className="col-12 col-md-6 col-lg-7 d-none d-md-flex flex-column align-items-center justify-content-center p-4 p-md-5 h-100 right-panel" style={{ backgroundColor: '#0d6efd' }}>
         
-        <div className="w-100 d-flex justify-content-center align-items-center mb-4 px-3" style={{ height: '55vh', minHeight: '350px' }}>
-          <img 
-            src="/mirai_dashboard_illustration.png" 
-            alt="Mirai Dashboard UI Illustration" 
-            className="img-fluid rounded shadow-lg"
-            style={{ 
-              maxWidth: '90%', 
-              maxHeight: '100%', 
-              objectFit: 'contain'
-            }} 
-          />
+        <div className="w-100 position-relative d-flex flex-column align-items-center justify-content-center mb-4 px-3" style={{ height: '55vh', minHeight: '350px' }}>
+          {slides.map((slide, idx) => (
+            <div
+              key={idx}
+              className="w-100 h-100 d-flex justify-content-center align-items-center position-absolute start-0 top-0 px-3"
+              style={{ 
+                opacity: idx === activeSlide ? 1 : 0,
+                zIndex: idx === activeSlide ? 2 : 1,
+                transition: 'opacity 0.8s ease-in-out'
+              }}
+            >
+              <img 
+                src={slide.image} 
+                alt={slide.title} 
+                className="img-fluid rounded shadow-lg"
+                style={{ 
+                  maxWidth: '90%', 
+                  maxHeight: '100%', 
+                  objectFit: 'contain'
+                }} 
+              />
+            </div>
+          ))}
         </div>
 
         {/* Hero Text */}
-        <div className="text-center text-white mt-3 z-1">
-          <h3 className="fw-bold mb-3" style={{ fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)' }}>Connect with every property.</h3>
-          <p className="text-white-50 mx-auto mb-0" style={{ maxWidth: '400px', fontSize: '0.95rem', lineHeight: '1.5' }}>
-            Everything you need in an easily customizable and unified management dashboard.
-          </p>
+        <div className="text-center text-white mt-3 z-3 position-relative w-100" style={{ minHeight: '120px' }}>
+          {slides.map((slide, idx) => (
+            <div
+              key={idx}
+              className="w-100 px-3"
+              style={{ 
+                opacity: idx === activeSlide ? 1 : 0,
+                position: idx === activeSlide ? 'relative' : 'absolute',
+                top: 0,
+                left: 0,
+                transition: 'opacity 0.8s ease-in-out'
+              }}
+            >
+              <h3 className="fw-bold mb-3" style={{ fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)' }}>{slide.title}</h3>
+              <p className="text-white-50 mx-auto mb-0" style={{ maxWidth: '400px', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                {slide.description}
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* Carousel Dots */}
-        <div className="d-flex gap-2 mt-4 mb-2">
-          <div className="rounded-circle bg-white" style={{ width: '6px', height: '6px' }}></div>
-          <div className="rounded-circle bg-white opacity-50" style={{ width: '6px', height: '6px' }}></div>
-          <div className="rounded-circle bg-white opacity-50" style={{ width: '6px', height: '6px' }}></div>
+        <div className="d-flex gap-2 mt-4 mb-2 z-3 position-relative">
+          {slides.map((_, idx) => (
+            <div 
+              key={idx}
+              onClick={() => setActiveSlide(idx)}
+              className="rounded-circle bg-white cursor-pointer" 
+              style={{ 
+                width: '8px', 
+                height: '8px', 
+                opacity: idx === activeSlide ? 1 : 0.5,
+                transform: idx === activeSlide ? 'scale(1.2)' : 'scale(1)',
+                transition: 'all 0.3s ease-in-out'
+              }}
+            ></div>
+          ))}
         </div>
 
       </div>

@@ -103,7 +103,7 @@ export default function CreateUserPage() {
     phoneNumber: '', emergencyNumber: '', address: '',
     companyName: '', tenantType: 'Individual', gstPan: '',
     floorAssignmentStartDate: '', floorAssignmentEndDate: '',
-    monthlyManagementAmount: 0, paymentType: 'Monthly', paymentDueDay: 5,
+    monthlyManagementAmount: 0, totalAgreementAmount: 0, paymentType: 'Monthly Installment', paymentDueDay: 5,
     agreementStatus: 'Active', remarks: '', staffCategory: 'None'
   });
   
@@ -419,6 +419,47 @@ export default function CreateUserPage() {
 
   const termMonths = getTermMonths();
   const monthlyRate = formData.monthlyManagementAmount || 0;
+  const isOwner = formData.role === 'OFFICE_OWNER';
+  
+  // Calculate cycle payment & total term value
+  const totalAgreementAmt = isOwner ? (formData.totalAgreementAmount || 0) : (monthlyRate * termMonths);
+  
+  const getInstallmentAmt = () => {
+    if (!isOwner) {
+      if (formData.paymentType === 'Quarterly') return monthlyRate * 3;
+      if (formData.paymentType === 'Yearly') return monthlyRate * 12;
+      return monthlyRate;
+    }
+    if (formData.paymentType === 'One Time') return totalAgreementAmt;
+    if (formData.paymentType === 'Custom Installment') return 0;
+    
+    const divisor = formData.paymentType === 'Monthly Installment' ? termMonths
+      : formData.paymentType === 'Quarterly Installment' ? Math.ceil(termMonths / 3)
+      : formData.paymentType === 'Half-Yearly Installment' ? Math.ceil(termMonths / 6)
+      : formData.paymentType === 'Yearly Installment' ? Math.ceil(termMonths / 12)
+      : 1;
+    return Math.ceil(totalAgreementAmt / Math.max(1, divisor));
+  };
+
+  const installmentAmt = getInstallmentAmt();
+  const pendingBal = totalAgreementAmt; // 0 paid on creation
+  
+  const getInitialPayStatus = () => {
+    if (totalAgreementAmt === 0) return 'Paid';
+    if (formData.floorAssignmentStartDate) {
+      const start = new Date(formData.floorAssignmentStartDate);
+      const today = new Date();
+      if (today > start) {
+        const dueDay = formData.paymentDueDay || 5;
+        const currentMonthDue = new Date(today.getFullYear(), today.getMonth(), dueDay);
+        if (today > currentMonthDue) {
+          return 'Overdue';
+        }
+      }
+    }
+    return 'Pending';
+  };
+  const initialPayStatus = getInitialPayStatus();
   
   let cyclePayment = monthlyRate;
   if (formData.paymentType === 'Quarterly') {
@@ -840,19 +881,42 @@ export default function CreateUserPage() {
                           {validationErrors.floorAssignmentEndDate && <div className="invalid-feedback small">{validationErrors.floorAssignmentEndDate}</div>}
                         </div>
 
-                        <div className="col-md-4">
-                          <label className="form-label small fw-bold text-dark mb-1">Monthly Management Amount *</label>
-                          <input type="number" className="form-control py-2 shadow-none" required value={formData.monthlyManagementAmount} onChange={(e) => setFormData({...formData, monthlyManagementAmount: Number(e.target.value)})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
-                        </div>
+                        {formData.role === 'OFFICE_OWNER' ? (
+                          <>
+                            <div className="col-md-4">
+                              <label className="form-label small fw-bold text-dark mb-1">Total Agreement Amount *</label>
+                              <input type="number" className="form-control py-2 shadow-none" required value={formData.totalAgreementAmount} onChange={(e) => setFormData({...formData, totalAgreementAmount: Number(e.target.value)})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                            </div>
 
-                        <div className="col-md-4">
-                          <label className="form-label small fw-bold text-dark mb-1">Payment Type *</label>
-                          <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({...formData, paymentType: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Yearly">Yearly</option>
-                          </select>
-                        </div>
+                            <div className="col-md-4">
+                              <label className="form-label small fw-bold text-dark mb-1">Payment Type *</label>
+                              <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({...formData, paymentType: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                                <option value="One Time">One Time</option>
+                                <option value="Monthly Installment">Monthly Installment</option>
+                                <option value="Quarterly Installment">Quarterly Installment</option>
+                                <option value="Half-Yearly Installment">Half-Yearly Installment</option>
+                                <option value="Yearly Installment">Yearly Installment</option>
+                                <option value="Custom Installment">Custom Installment</option>
+                              </select>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="col-md-4">
+                              <label className="form-label small fw-bold text-dark mb-1">Monthly Management Amount *</label>
+                              <input type="number" className="form-control py-2 shadow-none" required value={formData.monthlyManagementAmount} onChange={(e) => setFormData({...formData, monthlyManagementAmount: Number(e.target.value)})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                            </div>
+
+                            <div className="col-md-4">
+                              <label className="form-label small fw-bold text-dark mb-1">Payment Type *</label>
+                              <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({...formData, paymentType: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                                <option value="Monthly">Monthly</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Yearly">Yearly</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
 
                         <div className="col-md-4">
                           <label className="form-label small fw-bold text-dark mb-1">Payment Due Day *</label>
@@ -1017,14 +1081,33 @@ export default function CreateUserPage() {
                               <span className="text-muted small d-block">Agreement Status</span>
                               <strong className="text-dark small">{formData.agreementStatus}</strong>
                             </div>
-                            <div className="col-sm-4">
-                              <span className="text-muted small d-block">Monthly Rate</span>
-                              <strong className="text-dark small">₹{monthlyRate.toLocaleString()}</strong>
-                            </div>
-                            <div className="col-sm-4">
-                              <span className="text-muted small d-block">Payment Cycle</span>
-                              <strong className="text-dark small">{formData.paymentType}</strong>
-                            </div>
+                            {isOwner ? (
+                              <>
+                                <div className="col-sm-4">
+                                  <span className="text-muted small d-block">Total Agreement Amount</span>
+                                  <strong className="text-dark small">₹{totalAgreementAmt.toLocaleString()}</strong>
+                                </div>
+                                <div className="col-sm-4">
+                                  <span className="text-muted small d-block">Installment Amount</span>
+                                  <strong className="text-dark small">₹{installmentAmt.toLocaleString()}</strong>
+                                </div>
+                                <div className="col-sm-4">
+                                  <span className="text-muted small d-block">Payment Cycle</span>
+                                  <strong className="text-dark small">{formData.paymentType}</strong>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="col-sm-4">
+                                  <span className="text-muted small d-block">Monthly Rate</span>
+                                  <strong className="text-dark small">₹{monthlyRate.toLocaleString()}</strong>
+                                </div>
+                                <div className="col-sm-4">
+                                  <span className="text-muted small d-block">Payment Cycle</span>
+                                  <strong className="text-dark small">{formData.paymentType}</strong>
+                                </div>
+                              </>
+                            )}
                             <div className="col-sm-4">
                               <span className="text-muted small d-block">Monthly Due Day</span>
                               <strong className="text-dark small">{formData.paymentDueDay}th</strong>
@@ -1146,20 +1229,46 @@ export default function CreateUserPage() {
                             <span className="fw-bold text-dark small">{formData.paymentType}</span>
                           </div>
 
-                          <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                            <span className="text-muted small">Monthly Rate</span>
-                            <span className="fw-bold text-dark small">₹{monthlyRate.toLocaleString()} / mo</span>
-                          </div>
+                          {isOwner ? (
+                            <>
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Agreement Duration</span>
+                                <span className="fw-bold text-dark small">{termMonths} Months</span>
+                              </div>
 
-                          <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                            <span className="text-muted small">Pay per Cycle ({formData.paymentType})</span>
-                            <span className="fw-bold text-primary small">₹{cyclePayment.toLocaleString()}</span>
-                          </div>
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Total Agreement Amount</span>
+                                <span className="fw-bold text-success small">₹{totalAgreementAmt.toLocaleString()}</span>
+                              </div>
 
-                          <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                            <span className="text-muted small">Total Term Value (12 mos)</span>
-                            <span className="fw-bold text-success small">₹{totalTermAmount.toLocaleString()}</span>
-                          </div>
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Pending Balance</span>
+                                <span className="fw-bold text-danger small">₹{pendingBal.toLocaleString()}</span>
+                              </div>
+
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Next Installment Due</span>
+                                <span className="fw-bold text-primary small">₹{installmentAmt.toLocaleString()}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Monthly Rate</span>
+                                <span className="fw-bold text-dark small">₹{monthlyRate.toLocaleString()} / mo</span>
+                              </div>
+
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Pay per Cycle ({formData.paymentType})</span>
+                                <span className="fw-bold text-primary small">₹{cyclePayment.toLocaleString()}</span>
+                              </div>
+
+                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span className="text-muted small">Total Term Value ({termMonths} mos)</span>
+                                <span className="fw-bold text-success small">₹{totalTermAmount.toLocaleString()}</span>
+                              </div>
+                            </>
+                          )}
 
                           <div className="p-2 bg-primary bg-opacity-5 rounded mt-1 border border-primary border-opacity-10">
                             <div className="text-secondary" style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
@@ -1171,17 +1280,15 @@ export default function CreateUserPage() {
 
                         {/* Status Badge Row */}
                         <div className="d-flex align-items-center justify-content-between p-2 border rounded-3 bg-white">
-                          <span className="small fw-semibold text-muted" style={{ fontSize: '0.8rem' }}>Agreement Status</span>
+                          <span className="small fw-semibold text-muted" style={{ fontSize: '0.8rem' }}>Payment Status</span>
                           <span className="badge rounded-pill px-3 py-1.5 fw-bold" style={{
                             fontSize: '0.75rem',
-                            backgroundColor: formData.agreementStatus === 'Active' ? '#e6f4ea' :
-                                             formData.agreementStatus === 'Pending' ? '#fef7e0' :
-                                             formData.agreementStatus === 'Suspended' ? '#fce8e6' : '#f1f5f9',
-                            color: formData.agreementStatus === 'Active' ? '#137333' :
-                                   formData.agreementStatus === 'Pending' ? '#b06000' :
-                                   formData.agreementStatus === 'Suspended' ? '#c5221f' : '#475569'
+                            backgroundColor: initialPayStatus === 'Paid' ? '#e6f4ea' :
+                                             initialPayStatus === 'Overdue' ? '#fce8e6' : '#fef7e0',
+                            color: initialPayStatus === 'Paid' ? '#137333' :
+                                   initialPayStatus === 'Overdue' ? '#c5221f' : '#b06000'
                           }}>
-                            {formData.agreementStatus || 'Active'}
+                            {initialPayStatus}
                           </span>
                         </div>
                       </>

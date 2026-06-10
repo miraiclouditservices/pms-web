@@ -24,12 +24,12 @@ export default function Sidebar() {
 
 
   const displayName = user ? user.name : "Admin User";
-  const displayRole = user 
-    ? (user.role === "Admin" ? "SUPER_ADMIN" : user.role === "Owner" ? "OFFICE_OWNER" : user.role) 
+  const displayRole = user
+    ? (user.role === "Admin" ? "SUPER_ADMIN" : user.role === "Owner" ? "OFFICE_OWNER" : user.role)
     : "SUPER_ADMIN";
   const avatarChar = displayName ? displayName.charAt(0).toUpperCase() : "A";
 
-  const isSuperAdmin = user?.role === "SUPER_ADMIN" || user?.role === "Admin";
+  const isSuperAdmin = user?.role === "SUPER_ADMIN" || user?.role === "Admin" || user?.role === "Super Admin";
   const permissions = (user as any)?.permissions || [];
 
   const hasAccess = (permission: string) => isSuperAdmin || permissions.includes(permission);
@@ -43,11 +43,11 @@ export default function Sidebar() {
         ...(hasAccess('view_floors') || user?.role === 'STAFF_ADMIN' ? [{ name: "Floors", path: "/admin/floors", icon: "hgi-layers-01" }] : []),
         ...(hasAccess('view_floors') || user?.role === 'STAFF_ADMIN' ? [{ name: "Units and sft", path: "/admin/units", icon: "hgi-door-01" }] : []),
         ...(hasAccess('view_tenants') || user?.role === 'STAFF_ADMIN' ? [{ name: "Leases", path: "/admin/leases", icon: "hgi-agreement-01" }] : []),
-        ...(hasAccess('view_finance') || user?.role === 'STAFF_ADMIN' ? [
-            { name: "Finance / Billing", path: "/admin/finance", icon: "hgi-invoice-01" }
-        ] : []),
+        // ...(hasAccess('view_finance') || user?.role === 'STAFF_ADMIN' ? [
+        //   { name: "Finance / Billing", path: "/admin/finance", icon: "hgi-invoice-01" }
+        // ] : []),
         ...(user?.role === 'SUPER_ADMIN' || user?.role === 'Admin' || user?.role === 'FLOOR_ADMIN' || user?.role === 'Owner' || user?.role === 'OFFICE_OWNER' || user?.role === 'STAFF_ADMIN' ? [
-            { name: "Payments", path: "/admin/payments", icon: "hgi-credit-card" }
+          { name: "Payments", path: "/admin/payments", icon: "hgi-credit-card" }
         ] : []),
       ]
     },
@@ -58,15 +58,15 @@ export default function Sidebar() {
           { name: "Helpdesk", path: "/admin/helpdesk", icon: "hgi-headset" }
         ] : []),
         ...(hasAccess('manage_visitors') || user?.role === 'STAFF_ADMIN' ? [
-            { name: "Visitors", path: "/admin/visitors", icon: "hgi-identity-card" },
-            { name: "Materials", path: "/admin/materials", icon: "hgi-package" },
-            { name: "Bookings", path: "/admin/bookings", icon: "hgi-calendar-01" }
+          { name: "Visitors", path: "/admin/visitors", icon: "hgi-identity-card" },
+          { name: "Materials", path: "/admin/materials", icon: "hgi-package" },
+          { name: "Bookings", path: "/admin/bookings", icon: "hgi-calendar-01" }
         ] : []),
         ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' || user?.role === 'FLOOR_ADMIN' ? [
-            { name: "Assets", path: "/admin/assets", icon: "hgi-tools" }
+          { name: "Assets", path: "/admin/assets", icon: "hgi-tools" }
         ] : []),
         ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' ? [
-            { name: "Vendors", path: "/admin/vendors", icon: "hgi-truck" }
+          { name: "Vendors", path: "/admin/vendors", icon: "hgi-truck" }
         ] : [])
       ]
     },
@@ -77,10 +77,10 @@ export default function Sidebar() {
           { name: "Access Management", path: "/admin/users", icon: "hgi-user-shield-01" },
         ] : []),
         ...(hasAccess('view_analytics') ? [
-            { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "hgi-pie-chart" }
+          { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "hgi-pie-chart" }
         ] : []),
         ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' ? [
-            { name: "Reports", path: "/admin/reports", icon: "hgi-analytics-01" }
+          { name: "Reports", path: "/admin/reports", icon: "hgi-analytics-01" }
         ] : [])
       ]
     },
@@ -121,8 +121,8 @@ export default function Sidebar() {
                 const isActive = pathname.startsWith(item.path);
                 return (
                   <li key={item.name}>
-                    <Link 
-                      href={item.path} 
+                    <Link
+                      href={item.path}
                       className={`${styles.navLink} ${isActive ? styles.navLinkActive : ""}`}
                     >
                       <i className={`hgi-stroke ${item.icon} ${styles.navIcon}`}></i>
