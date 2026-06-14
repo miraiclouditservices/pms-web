@@ -3,18 +3,30 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from "@/utils/api";
+import Table, { TableColumn } from "@/components/common/Table";
+import FilterDrawer from "@/components/users/FilterDrawer";
+import UserDetailView from "@/components/users/UserDetailView";
+import EditUserModal from "@/components/users/modals/EditUserModal";
+import ResetPasswordModal from "@/components/users/modals/ResetPasswordModal";
+import RecordPaymentModal from "@/components/users/modals/RecordPaymentModal";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All Roles');
-  
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [staffCategoryFilter, setStaffCategoryFilter] = useState('All');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
   // Navigation & details view state
   const [viewUser, setViewUser] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState('Overview');
   const [showPassword, setShowPassword] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loadingUsers, setLoadingUsers] = useState(true);
 
   // Agreement & payment data states
   const [agreementData, setAgreementData] = useState<any>(null);  // { agreements: [], summary: {} }
@@ -44,12 +56,29 @@ export default function UsersPage() {
   const [floors, setFloors] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
 
+  // Debounce search query
   useEffect(() => {
-    fetchUsers();
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
     fetchProperties();
     fetchFloors();
     fetchUnits();
   }, []);
+
+  // Reset pagination to page 1 when filter or query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, roleFilter, statusFilter, staffCategoryFilter]);
+
+  // Fetch users when dependencies change
+  useEffect(() => {
+    fetchUsers();
+  }, [currentPage, itemsPerPage, debouncedSearchQuery, roleFilter, statusFilter, staffCategoryFilter]);
 
   // Sync agreement & billing data when viewed user changes
   useEffect(() => {
@@ -62,16 +91,35 @@ export default function UsersPage() {
     }
   }, [viewUser]);
 
-  // Reset pagination to page 1 when filter or query changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, roleFilter]);
-
   const fetchUsers = async () => {
     try {
-      const res = await api.get('/users');
+      setLoadingUsers(true);
+      const params = new URLSearchParams();
+      params.append('page', String(currentPage));
+      params.append('limit', String(itemsPerPage));
+      if (debouncedSearchQuery.trim()) {
+        params.append('search', debouncedSearchQuery.trim());
+      }
+      if (roleFilter !== 'All Roles') {
+        params.append('role', roleFilter);
+      }
+      if (statusFilter !== 'All') {
+        params.append('agreementStatus', statusFilter);
+      }
+      if (staffCategoryFilter !== 'All') {
+        params.append('staffCategory', staffCategoryFilter);
+      }
+
+      const res = await api.get(`/users?${params.toString()}`);
       if (res.success) {
         setUsers(res.data);
+        if (res.pagination) {
+          setTotalItems(res.pagination.total);
+          setTotalPages(res.pagination.pages);
+        } else {
+          setTotalItems(res.data.length);
+          setTotalPages(Math.ceil(res.data.length / itemsPerPage) || 1);
+        }
         // If viewing, update the reference state to stay sync'd
         if (viewUser) {
           const updated = res.data.find((u: any) => u._id === viewUser._id);
@@ -80,6 +128,8 @@ export default function UsersPage() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoadingUsers(false);
     }
   };
 
@@ -171,7 +221,8 @@ export default function UsersPage() {
         notes: notesInput || 'Recorded via admin portal'
       });
       if (res.success) {
-        alert(`Payment of ₹${amt.toLocaleString()} recorded! Receipt: ${res.data?.payment?.receiptNumber || 'N/A'}`);
+        const receipt = res.data?.transactionId || 'N/A';
+        alert(`Payment of Ã¢â€šÂ¹${amt.toLocaleString()} recorded! Transaction ID / Receipt: ${receipt}`);
         setShowPaymentModal(false);
         setSelectedAgreement(null);
         setTransactionRefInput('');
@@ -179,6 +230,7 @@ export default function UsersPage() {
         setPaymentAmountInput('');
         setPaymentDateInput(new Date().toISOString().split('T')[0]);
         fetchAgreementData(viewUser._id);
+        fetchBillingData(viewUser._id);
         fetchUsers();
       }
     } catch (err: any) {
@@ -189,14 +241,12 @@ export default function UsersPage() {
   };
 
   // Password reset action
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent, password: string) => {
     e.preventDefault();
-    if (!viewUser || !newPassword.trim()) return;
+    if (!viewUser || !password.trim()) return;
     try {
       setIsSubmittingAction(true);
-      const res = await api.put(`/users/${viewUser._id}`, {
-        password: newPassword
-      });
+      const res = await api.put(`/users/${viewUser._id}`, { password });
       if (res.success) {
         alert('Password reset successfully!');
         setShowResetPasswordModal(false);
@@ -250,37 +300,23 @@ export default function UsersPage() {
   // Distinct Premium Badges for Roles
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'SUPER_ADMIN': 
+      case 'SUPER_ADMIN':
         return 'text-success border-success bg-success bg-opacity-10';
-      case 'Admin': 
+      case 'Admin':
         return 'text-dark border-secondary bg-light';
-      case 'Owner': 
+      case 'Owner':
       case 'Floor Owner':
         return 'text-warning border-warning bg-warning bg-opacity-10';
-      case 'OFFICE_OWNER': 
+      case 'OFFICE_OWNER':
         return 'text-purple border-purple bg-purple-light';
-      case 'FLOOR_ADMIN': 
+      case 'FLOOR_ADMIN':
         return 'text-primary border-primary bg-primary bg-opacity-10';
-      case 'STAFF_ADMIN': 
+      case 'STAFF_ADMIN':
         return 'text-info border-info bg-info bg-opacity-10';
-      default: 
+      default:
         return 'text-secondary border-secondary bg-light';
     }
   };
-
-  const filteredUsers = users.filter(user => {
-    const nameMatch = user.name ? user.name.toLowerCase().includes(searchQuery.toLowerCase()) : false;
-    const emailMatch = user.email ? user.email.toLowerCase().includes(searchQuery.toLowerCase()) : false;
-    const matchesSearch = nameMatch || emailMatch;
-    const matchesRole = roleFilter === 'All Roles' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  const totalItems = filteredUsers.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
 
   // Dynamic mapped names
   const getPropertyNames = (propIds: string[] = []) => {
@@ -299,15 +335,6 @@ export default function UsersPage() {
     }).join(', ');
   };
 
-  const getUnitNames = (unitIds: string[] = []) => {
-    if (!unitIds || unitIds.length === 0) return 'None';
-    return unitIds.map(id => {
-      const found = units.find(u => u._id === id);
-      if (!found) return 'Unknown Unit';
-      return found.unitName ? `${found.unitName} (Unit ${found.unitNumber})` : `Unit ${found.unitNumber}`;
-    }).join(', ');
-  };
-
   // Helper date duration parser
   const getAgreementDuration = (start: string, end: string) => {
     if (!start || !end) return 'N/A';
@@ -316,6 +343,84 @@ export default function UsersPage() {
     let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
     if (months <= 0) months = 1;
     return `${months} Months`;
+  };
+
+  // Helper to generate dynamic installment schedule
+  const generateInstallments = (user: any, agr: any, paymentsList: any[] = []) => {
+    const startStr = agr?.startDate || user?.floorAssignmentStartDate;
+    const endStr = agr?.endDate || user?.floorAssignmentEndDate;
+    if (!startStr || !endStr) return [];
+
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
+
+    // Term in months
+    const termMonths = Math.max((end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1, 1);
+
+    // Amount details
+    const totalAmount = agr?.totalAmount || user?.totalAgreementAmount || ((user?.monthlyManagementAmount || 0) * termMonths);
+    const paymentType = agr?.paymentType || user?.paymentType || 'Monthly';
+    const dueDay = agr?.paymentDueDay || user?.paymentDueDay || 5;
+
+    // Determine interval in months
+    let intervalMonths = 1;
+    if (paymentType.includes('Quarterly')) intervalMonths = 3;
+    else if (paymentType.includes('Half-Yearly')) intervalMonths = 6;
+    else if (paymentType.includes('Yearly')) intervalMonths = 12;
+    else if (paymentType.includes('One Time')) intervalMonths = termMonths;
+
+    // Number of installments
+    const numInstallments = Math.max(1, Math.ceil(termMonths / intervalMonths));
+    const installmentAmount = Math.ceil(totalAmount / numInstallments);
+
+    // Calculate total paid
+    let totalPaid = agr?.totalPaid || 0;
+    if (paymentsList && paymentsList.length > 0) {
+      totalPaid = paymentsList.reduce((sum: number, p: any) => sum + (p.amountPaid || p.amount || 0), 0);
+    }
+
+    const schedule = [];
+    let remainingPaid = totalPaid;
+
+    for (let i = 0; i < numInstallments; i++) {
+      const currentDueDate = new Date(start);
+      currentDueDate.setMonth(start.getMonth() + i * intervalMonths);
+      currentDueDate.setDate(dueDay);
+
+      const formattedDueDate = currentDueDate.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+
+      let paid = 0;
+      let balance = installmentAmount;
+      let status = 'Pending';
+
+      if (remainingPaid >= installmentAmount) {
+        paid = installmentAmount;
+        balance = 0;
+        status = 'Paid';
+        remainingPaid -= installmentAmount;
+      } else if (remainingPaid > 0) {
+        paid = remainingPaid;
+        balance = installmentAmount - remainingPaid;
+        status = 'Partial';
+        remainingPaid = 0;
+      }
+
+      schedule.push({
+        invoiceNo: `INV-${(i + 1).toString().padStart(3, '0')}`,
+        dueDate: formattedDueDate,
+        amount: installmentAmount,
+        paid,
+        balance,
+        status
+      });
+    }
+
+    return schedule;
   };
 
   // Helper for generating custom human User IDs
@@ -335,189 +440,184 @@ export default function UsersPage() {
     return current.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  return (
-    <div className="p-0" style={{ backgroundColor: '#ffffff', minHeight: '100vh', fontFamily: 'var(--font-geist-sans)' }}>
-      <style jsx global>{`
-        .text-purple { color: #8b5cf6 !important; }
-        .border-purple { border-color: #8b5cf6 !important; }
-        .bg-purple { background-color: #8b5cf6 !important; }
-        .bg-purple-light { background-color: rgba(139, 92, 246, 0.1) !important; }
-        
-        .action-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s ease;
-          border: 1px solid #e2e8f0;
-          background: #ffffff;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-        .action-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 6px rgba(0,0,0,0.08);
-        }
-        .action-btn-view:hover {
-          color: #014aad !important;
-          border-color: #014aad !important;
-          background: #f0f7ff !important;
-        }
-        .action-btn-folder:hover {
-          color: #d97706 !important;
-          border-color: #d97706 !important;
-          background: #fffbeb !important;
-        }
-        .action-btn-revoke:hover {
-          color: #dc2626 !important;
-          border-color: #dc2626 !important;
-          background: #fef2f2 !important;
-        }
+  const getDaysRemaining = (endDateString: string) => {
+    if (!endDateString) return null;
+    const endDate = new Date(endDateString);
+    const today = new Date();
+    endDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diffTime = endDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
-        /* Bento UI Styles */
-        .profile-avatar {
-          width: 80px;
-          height: 80px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          color: white;
-          font-size: 2rem;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          box-shadow: 0 4px 12px rgba(29, 78, 216, 0.15);
-        }
-        .active-badge-dot {
-          width: 14px;
-          height: 14px;
-          background-color: #22c55e;
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          position: absolute;
-          bottom: 2px;
-          right: 2px;
-        }
-        .meta-label {
-          font-size: 0.75rem;
-          color: #64748b;
-          margin-bottom: 2px;
-        }
-        .meta-value {
-          font-size: 0.85rem;
-          color: #1e293b;
-          font-weight: 600;
-        }
-        .stat-card-bento {
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          padding: 14px;
-          text-align: center;
-          min-width: 110px;
-          flex: 1;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-        }
-        .stat-card-value {
-          font-size: 1.4rem;
-          font-weight: 700;
-          color: #1e293b;
-          margin-top: 4px;
-        }
-        .stat-card-label {
-          font-size: 0.75rem;
-          color: #64748b;
-        }
-        .detail-card {
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 16px;
-          padding: 24px;
-          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);
-          height: 100%;
-        }
-        .detail-card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid #f1f5f9;
-        }
-        .detail-grid-item {
-          margin-bottom: 16px;
-        }
-        .detail-grid-label {
-          font-size: 0.8rem;
-          color: #64748b;
-          margin-bottom: 4px;
-        }
-        .detail-grid-value {
-          font-size: 0.9rem;
-          color: #1e293b;
-          font-weight: 600;
-        }
-        .tab-item {
-          font-weight: 600;
-          color: #64748b;
-          border: none;
-          background: none;
-          padding: 12px 16px;
-          position: relative;
-          transition: all 0.2s ease;
-        }
-        .tab-item.active {
-          color: #014aad;
-        }
-        .tab-item.active::after {
-          content: '';
-          position: absolute;
-          bottom: 0;
-          left: 16px;
-          right: 16px;
-          height: 3px;
-          background-color: #014aad;
-          border-radius: 99px;
-        }
-        .quick-action-btn {
-          border: 1px solid #e2e8f0;
-          background: #ffffff;
-          border-radius: 8px;
-          padding: 10px 16px;
-          font-weight: 600;
-          font-size: 0.85rem;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          transition: all 0.2s ease;
-        }
-        .quick-action-btn:hover {
-          background: #f8fafc;
-          border-color: #cbd5e1;
-        }
-      `}</style>
+  const sendExpiryNotification = async (user: any) => {
+    try {
+      const res = await api.post('/notifications', {
+        user: user._id,
+        title: 'Agreement Expiring Soon',
+        message: `Dear ${user.name}, your access agreement is expiring soon (on ${new Date(user.floorAssignmentEndDate).toLocaleDateString('en-GB')}). Please renew it as soon as possible.`,
+        type: 'Alert'
+      });
+      if (res.success) {
+        alert(`Notification sent successfully to ${user.name}!`);
+      } else {
+        alert(`Failed to send notification: ${res.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error sending notification: ${err.message || err}`);
+    }
+  };
+
+  const ShimmerRow = () => (
+    <tr className="border-0">
+      <td className="py-3 px-4 align-middle">
+        <div className="shimmer-wrapper shimmer-line" style={{ width: '30px' }}></div>
+      </td>
+      <td className="py-3 px-4 align-middle">
+        <div className="d-flex align-items-center gap-3">
+          <div className="shimmer-wrapper shimmer-circle"></div>
+          <div className="d-flex flex-column gap-2 flex-grow-1">
+            <div className="shimmer-wrapper shimmer-line" style={{ width: '120px' }}></div>
+            <div className="shimmer-wrapper shimmer-line" style={{ width: '180px' }}></div>
+          </div>
+        </div>
+      </td>
+      <td className="py-3 px-4 align-middle">
+        <div className="d-flex gap-2">
+          <div className="shimmer-wrapper shimmer-line" style={{ width: '80px', height: '20px', borderRadius: '12px' }}></div>
+        </div>
+      </td>
+      <td className="py-3 px-4 align-middle">
+        <div className="shimmer-wrapper shimmer-line" style={{ width: '100px' }}></div>
+      </td>
+      <td className="py-3 px-4 align-middle text-center">
+        <div className="shimmer-wrapper shimmer-circle" style={{ width: '32px', height: '32px' }}></div>
+      </td>
+    </tr>
+  );
+
+  const tableColumns: TableColumn<any>[] = [
+    {
+      header: "Name",
+      render: (user) => (
+        <div className="d-flex align-items-center gap-3">
+          <div className="bg-white rounded-circle d-flex align-items-center justify-content-center text-dark fw-bold shadow-sm animate-avatar" style={{ width: '40px', height: '40px', fontSize: '0.9rem', border: '1px solid #e2e8f0' }}>
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h6 className="fw-bold mb-1 text-dark" style={{ fontSize: '0.9rem' }}>{user.name}</h6>
+            <span className="text-muted" style={{ fontSize: '0.8rem' }}>{user.email}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Access Type",
+      render: (user) => (
+        <div className="d-flex flex-column align-items-start gap-1">
+          <span className={`badge rounded-pill px-3 py-1 border ${getRoleBadge(user.role)}`} style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+            {user.role === 'SUPER_ADMIN' ? 'Super Admin' :
+              user.role === 'FLOOR_ADMIN' ? 'Floor Admin' :
+                user.role === 'OFFICE_OWNER' ? 'Office Owner' :
+                  user.role === 'STAFF_ADMIN' ? 'Staff Admin' : user.role}
+          </span>
+          {user.role === 'STAFF_ADMIN' && user.staffCategory && user.staffCategory !== 'None' && (
+            <span className="badge rounded-pill px-2 py-0.5 bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style={{ fontSize: '0.65rem' }}>
+              <i className="hgi-stroke hgi-tag me-1"></i>{user.staffCategory}
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      header: "Agreement Dates",
+      render: (user) => {
+        const daysRemaining = getDaysRemaining(user.floorAssignmentEndDate);
+        const isExpiringSoon = daysRemaining !== null && daysRemaining <= 3 && daysRemaining >= 0;
+        const isExpired = daysRemaining !== null && daysRemaining < 0;
+
+        return (
+          <div className="d-flex flex-column gap-1">
+            <div className="d-flex align-items-center gap-1">
+              <span className="text-muted small" style={{ minWidth: '70px', fontSize: '0.75rem' }}>Start Date:</span>
+              <span className="text-dark fw-bold" style={{ fontSize: '0.82rem' }}>
+                {user.floorAssignmentStartDate ? new Date(user.floorAssignmentStartDate).toLocaleDateString('en-GB') : 'N/A'}
+              </span>
+            </div>
+            <div className="d-flex align-items-center gap-1">
+              <span className="text-muted small" style={{ minWidth: '70px', fontSize: '0.75rem' }}>End Date:</span>
+              <span className="text-dark fw-bold" style={{ fontSize: '0.82rem' }}>
+                {user.floorAssignmentEndDate ? new Date(user.floorAssignmentEndDate).toLocaleDateString('en-GB') : 'Permanent'}
+              </span>
+              {isExpiringSoon && (
+                <span className="badge rounded-pill bg-warning text-dark border border-warning border-opacity-50 px-2 py-0.5 ms-2 animate-pulse-warning" style={{ fontSize: '0.65rem' }}>
+                  Ã¢Å¡Â Ã¯Â¸Â Due in {daysRemaining} days
+                </span>
+              )}
+              {isExpired && (
+                <span className="badge rounded-pill bg-danger text-white border border-danger border-opacity-50 px-2 py-0.5 ms-2" style={{ fontSize: '0.65rem' }}>
+                  Ã°Å¸Å¡Â« Overdue (Expired)
+                </span>
+              )}
+              {(isExpiringSoon || isExpired) && (
+                <button
+                  className="btn btn-sm btn-outline-danger d-inline-flex align-items-center justify-content-center p-1 border-0 shadow-none hover-notify ms-1"
+                  style={{ borderRadius: '50%', width: '20px', height: '20px' }}
+                  title="Send Expiry Warning Notification"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sendExpiryNotification(user);
+                  }}
+                >
+                  <i className="hgi-stroke hgi-notification-02" style={{ fontSize: '0.8rem' }}></i>
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      header: "Actions",
+      style: { textAlign: 'center' },
+      render: (user) => (
+        <div className="d-flex justify-content-center gap-2">
+          <button
+            className="action-btn action-btn-view text-dark"
+            title="View Detailed Profile"
+            onClick={() => setViewUser(user)}
+          >
+            <i className="hgi-stroke hgi-view"></i>
+          </button>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <div className={`p-0 d-flex flex-column ${!viewUser ? 'bg-white border rounded-4 ' : ''}`} style={{ height: 'calc(100vh - 104px)', fontFamily: 'var(--font-geist-sans)', overflow: 'hidden' }}>
+
 
       {!viewUser ? (
         /* ======================== 1. USERS LIST COMPONENT ======================== */
-        <div className="bg-white d-flex flex-column" style={{ height: '100vh', margin: '0px', padding: '0px' }}>
-          
+        <div className="bg-white d-flex flex-column h-100" style={{ margin: '0px', padding: '0px', overflow: 'hidden' }}>
+
           {/* Header & Filter Bar Merged */}
-          <div className="d-flex justify-content-between align-items-center mb-3 pb-2 pt-0 flex-shrink-0" style={{ backgroundColor: '#ffffff' }}>
+          <div className="d-flex justify-content-between align-items-center mb-1 pb-2 pt-3 px-4 flex-shrink-0" style={{ backgroundColor: '#ffffff' }}>
             <div className="d-flex gap-4">
               <div style={{ paddingBottom: '8px', cursor: 'pointer', marginBottom: '-1px' }}>
                 <span className="fw-bold text-dark" style={{ fontSize: '1rem' }}>Access Management</span>
               </div>
             </div>
 
-            {/* Right: Search, Filter, & Provision Button */}
+            {/* Right: Search, Filter Toggle, & Provision Button */}
             <div className="d-flex gap-3 align-items-center">
-              <div className="position-relative" style={{ width: '260px' }}>
+              <div className="position-relative" style={{ width: '250px' }}>
                 <input
                   type="text"
-                  className="form-control px-3 py-2 shadow-sm"
-                  placeholder="Search by name or official email..."
+                  className="form-control px-3 py-2"
+                  placeholder="Search by name, email, phone..."
                   style={{ borderRadius: '4px', border: '1px solid #e0e0e0', fontSize: '0.85rem' }}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -525,28 +625,20 @@ export default function UsersPage() {
                 <i className="hgi-stroke hgi-search-01 position-absolute text-muted" style={{ right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.85rem' }}></i>
               </div>
 
-              <div className="dropdown">
-                <button className="btn bg-white border d-flex align-items-center justify-content-center shadow-sm" data-bs-toggle="dropdown" style={{ width: '40px', height: '40px', borderRadius: '4px', borderColor: '#e0e0e0' }}>
-                  <i className="hgi-stroke hgi-filter text-dark"></i>
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3 mt-2 p-2" style={{ minWidth: '200px', zIndex: 1050 }}>
-                  <li><h6 className="dropdown-header fw-bold text-dark px-2">Filter by Role</h6></li>
-                  {['All Roles', 'SUPER_ADMIN', 'Admin', 'FLOOR_ADMIN', 'OFFICE_OWNER', 'STAFF_ADMIN'].map(role => (
-                    <li key={role}>
-                      <button
-                        className={`dropdown-item rounded py-2 d-flex align-items-center justify-content-between ${roleFilter === role ? 'bg-primary bg-opacity-10 text-primary fw-bold' : ''}`}
-                        onClick={() => setRoleFilter(role)}
-                      >
-                        {role} {roleFilter === role && <i className="hgi-stroke hgi-checkmark-circle-02 text-primary"></i>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+
+
+              <button
+                className={`btn border d-flex align-items-center justify-content-center ${showAdvancedFilters ? 'bg-primary text-white border-primary' : 'bg-white text-dark border-light'}`}
+                onClick={() => setShowAdvancedFilters(true)}
+                style={{ width: '40px', height: '40px', borderRadius: '4px' }}
+                title="Toggle Filters"
+              >
+                <i className={`hgi-stroke hgi-filter ${showAdvancedFilters ? 'text-white' : 'text-dark'}`}></i>
+              </button>
 
               <Link
                 href="/admin/users/create"
-                className="btn d-flex align-items-center justify-content-center gap-2 shadow-sm px-4"
+                className="btn d-flex align-items-center justify-content-center gap-2 px-4"
                 style={{ backgroundColor: "#014aad", color: '#ffffff', fontWeight: '500', borderRadius: '4px', height: '40px', fontSize: '0.85rem', border: 'none' }}
               >
                 <i className="hgi-stroke hgi-user-add-01"></i> new user
@@ -554,1244 +646,102 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* Table Wrapper */}
-          <div className="table-responsive flex-grow-1" style={{ overflowY: 'auto', minHeight: 0 }}>
-            <table className="table mb-0 border-0 text-nowrap" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
-              <thead>
-                <tr className="border-0">
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopLeftRadius: '8px' }}>S No</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>User Name</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Access type</th>
-                  <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Creation date</th>
-                  <th className="py-3 px-4 fw-bold text-center" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopRightRadius: '8px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-              {currentItems.length > 0 ? (
-                currentItems.map((user, index) => (
-                  <tr key={user._id} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                    <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
-                      {String(indexOfFirstItem + index + 1).padStart(3, '0')}
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      <div className="d-flex align-items-center gap-3">
-                        <div className="bg-white rounded-circle d-flex align-items-center justify-content-center text-dark fw-bold shadow-sm" style={{ width: '40px', height: '40px', fontSize: '0.9rem', border: '1px solid #e2e8f0' }}>
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h6 className="fw-bold mb-1 text-dark" style={{ fontSize: '0.9rem' }}>{user.name}</h6>
-                          <span className="text-muted" style={{ fontSize: '0.8rem' }}>{user.email}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      <div className="d-flex align-items-center gap-2">
-                        <span className={`badge rounded-pill px-3 py-1 border ${getRoleBadge(user.role)}`} style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                          {user.role}
-                        </span>
-                        {user.role === 'STAFF_ADMIN' && user.staffCategory && user.staffCategory !== 'None' && (
-                          <span className="badge rounded-pill px-2 py-1 bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style={{ fontSize: '0.7rem' }}>
-                            <i className="hgi-stroke hgi-tag me-1"></i>{user.staffCategory}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      <span className="text-dark fw-bold" style={{ fontSize: '0.85rem' }}>
-                        {new Date(user.createdAt).toLocaleDateString('en-GB')}
-                      </span>
-                    </td>
-                    <td className="py-2 px-4 align-middle text-center" style={{ border: 'none' }}>
-                      <div className="d-flex justify-content-center gap-2">
-                        <button 
-                          className="action-btn action-btn-view text-dark" 
-                          title="View Detailed Profile"
-                          onClick={() => setViewUser(user)}
-                        >
-                          <i className="hgi-stroke hgi-view"></i>
-                        </button>
-
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="text-center py-5" style={{ border: 'none' }}>
-                    <div className="d-flex flex-column align-items-center gap-3 py-4">
-                      <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '80px', height: '80px' }}>
-                        <i className="hgi-stroke hgi-user-group text-muted" style={{ fontSize: '2.5rem' }}></i>
-                      </div>
-                      <div className="text-center">
-                        <h5 className="fw-bold mb-1">No Staff Found</h5>
-                        <p className="text-muted small mx-auto" style={{ maxWidth: '300px' }}>
-                          No provisioned accounts found matching selected criteria.
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Pagination Footer ───────────────────────────────────────────── */}
-          <div className="px-4 py-3 border-top d-flex justify-content-between align-items-center bg-white flex-shrink-0">
-            <span className="text-muted small">
-              Showing {totalItems > 0 ? indexOfFirstItem + 1 : 0}–{Math.min(indexOfLastItem, totalItems)} of {totalItems} entries
-            </span>
-            <div className="d-flex gap-1 align-items-center">
-              <button 
-                className="btn btn-sm btn-light border px-2 shadow-none" 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                <i className="bi bi-chevron-left" />
-              </button>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`btn btn-sm px-3 shadow-none fw-bold ${currentPage === page ? 'text-white' : 'text-dark border-0 bg-transparent'}`}
-                  style={{ 
-                    backgroundColor: currentPage === page ? '#014aad' : 'transparent', 
-                    borderRadius: '6px' 
-                  }}
-                >
-                  {page}
-                </button>
-              ))}
-
-              <button 
-                className="btn btn-sm btn-light border px-2 shadow-none" 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                <i className="bi bi-chevron-right" />
-              </button>
-            </div>
-          </div>
+          {/* Right-aligned Advanced Filters Drawer */}
+          <FilterDrawer
+            isOpen={showAdvancedFilters}
+            onClose={() => setShowAdvancedFilters(false)}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            roleFilter={roleFilter}
+            setRoleFilter={setRoleFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            staffCategoryFilter={staffCategoryFilter}
+            setStaffCategoryFilter={setStaffCategoryFilter}
+            onReset={() => {
+              setRoleFilter('All Roles');
+              setStatusFilter('All');
+              setStaffCategoryFilter('All');
+              setSearchQuery('');
+              setCurrentPage(1);
+            }}
+          />
+          <Table
+            columns={tableColumns}
+            data={users}
+            isLoading={loadingUsers}
+            loadingMessage="Fetching user accounts..."
+            emptyMessage="No accounts match this query."
+            containerClassName="table-responsive-container table-responsive flex-grow-1"
+            rowClassName={(user, index) => "user-table-row"}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
         </div>
       ) : (
-        /* ======================== 2. PREMIUM DETAILS VIEW PAGE ======================== */
-        <div className="p-4" style={{ backgroundColor: '#f8fafc' }}>
-          
-          {/* Breadcrumbs & Header Controls Row */}
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div className="d-flex align-items-center">
-              <button 
-                onClick={() => setViewUser(null)} 
-                className="btn btn-link p-0 me-3 text-dark d-flex align-items-center justify-content-center"
-                style={{ textDecoration: 'none' }}
-              >
-                <i className="hgi-stroke hgi-arrow-left-01 fs-4 fw-bold"></i>
-              </button>
-              <nav aria-label="breadcrumb">
-                <ol className="breadcrumb mb-0 align-items-center" style={{ fontSize: '0.95rem' }}>
-                  <li className="breadcrumb-item">
-                    <span onClick={() => setViewUser(null)} style={{ cursor: 'pointer', color: '#64748b' }}>Users</span>
-                  </li>
-                  <li className="breadcrumb-item active text-dark fw-bold" aria-current="page">User Details</li>
-                </ol>
-              </nav>
-            </div>
-
-            {/* Header Action Buttons */}
-            <div className="d-flex gap-2">
-              <button 
-                onClick={startEditing} 
-                className="btn btn-outline-secondary bg-white text-dark d-flex align-items-center gap-2 px-3 py-2 shadow-sm"
-                style={{ borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #cbd5e1' }}
-              >
-                <i className="hgi-stroke hgi-pencil-line-01"></i> Edit User
-              </button>
-              
-              <div className="dropdown">
-                <button 
-                  className="btn btn-outline-secondary bg-white text-dark d-flex align-items-center gap-2 px-3 py-2 shadow-sm dropdown-toggle"
-                  data-bs-toggle="dropdown"
-                  style={{ borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #cbd5e1' }}
-                >
-                  ... More Actions
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3 p-2">
-                  <li>
-                    <button className="dropdown-item py-2 rounded" onClick={() => setShowResetPasswordModal(true)}>
-                      <i className="hgi-stroke hgi-key-01 me-2 text-muted"></i> Reset Password
-                    </button>
-                  </li>
-                  <li>
-                    <button className="dropdown-item py-2 rounded text-danger" onClick={handleSuspendUser}>
-                      <i className="hgi-stroke hgi-user-block me-2"></i> {viewUser.agreementStatus === 'Suspended' ? 'Activate Account' : 'Suspend Account'}
-                    </button>
-                  </li>
-
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Top Profile Summary Bento Box */}
-          <div className="bg-white border p-4 mb-4 rounded-4 shadow-sm">
-            <div className="row align-items-center g-4">
-              
-              {/* Profile Avatar & Contact Details */}
-              <div className="col-lg-5 col-md-12 d-flex align-items-center gap-4 border-end border-light-subtle pr-lg-4">
-                <div className="profile-avatar">
-                  {viewUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                  <span className="active-badge-dot" style={{ backgroundColor: viewUser.agreementStatus === 'Suspended' ? '#ef4444' : '#22c55e' }}></span>
-                </div>
-                <div>
-                  <div className="d-flex align-items-center gap-2 flex-wrap mb-2">
-                    <h4 className="fw-bold mb-0 text-dark" style={{ fontSize: '1.4rem' }}>{viewUser.name}</h4>
-                    <span className="role-badge d-flex align-items-center gap-1">
-                      <i className="hgi-stroke hgi-user-shield-01 text-primary"></i> {viewUser.role}
-                    </span>
-                    <span className="status-badge-active" style={{ 
-                      backgroundColor: viewUser.agreementStatus === 'Suspended' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)',
-                      color: viewUser.agreementStatus === 'Suspended' ? '#ef4444' : '#22c55e'
-                    }}>
-                      {viewUser.agreementStatus || 'Active'}
-                    </span>
-                  </div>
-                  <div className="d-flex flex-column gap-1 text-muted" style={{ fontSize: '0.85rem' }}>
-                    <span className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-mail-01 text-muted"></i> {viewUser.email}
-                    </span>
-                    <span className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-smart-phone-01 text-muted"></i> {viewUser.phoneNumber || 'N/A'}
-                    </span>
-                    <span className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-location-01 text-muted"></i> {viewUser.address || 'N/A'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* User Metadata */}
-              <div className="col-lg-3 col-md-6 d-flex flex-column gap-3 border-end border-light-subtle px-lg-4">
-                <div className="d-flex align-items-center gap-3">
-                  <div className="bg-light p-2 rounded-3 d-flex align-items-center justify-content-center text-muted" style={{ width: '36px', height: '36px' }}>
-                    <i className="hgi-stroke hgi-badge fs-5"></i>
-                  </div>
-                  <div>
-                    <div className="meta-label">User ID</div>
-                    <div className="meta-value">{getDisplayUserId(viewUser, 0)}</div>
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center gap-3">
-                  <div className="bg-light p-2 rounded-3 d-flex align-items-center justify-content-center text-muted" style={{ width: '36px', height: '36px' }}>
-                    <i className="hgi-stroke hgi-calendar-01 fs-5"></i>
-                  </div>
-                  <div>
-                    <div className="meta-label">Created On</div>
-                    <div className="meta-value">
-                      {viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}, {viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center gap-3">
-                  <div className="bg-light p-2 rounded-3 d-flex align-items-center justify-content-center text-muted" style={{ width: '36px', height: '36px' }}>
-                    <i className="hgi-stroke hgi-clock-01 fs-5"></i>
-                  </div>
-                  <div>
-                    <div className="meta-label">Last Login</div>
-                    <div className="meta-value">
-                      {viewUser.createdAt ? new Date(new Date(viewUser.createdAt).getTime() + 1 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}, 04:45 PM
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bento Stats Block */}
-              <div className="col-lg-4 col-md-6 px-lg-4">
-                <div className="d-flex gap-3 justify-content-between">
-                  <div className="stat-card-bento d-flex flex-column align-items-center justify-content-center">
-                    <i className="hgi-stroke hgi-building-03 text-primary fs-4"></i>
-                    <div className="stat-card-value">{viewUser.assignedFloors?.length || 0}</div>
-                    <div className="stat-card-label">Total Floors</div>
-                  </div>
-
-                  <div className="stat-card-bento d-flex flex-column align-items-center justify-content-center">
-                    <i className="hgi-stroke hgi-layers text-purple fs-4"></i>
-                    <div className="stat-card-value">
-                      {floors.filter(f => !f.assignedAdmin).length || 0}
-                    </div>
-                    <div className="stat-card-label">Available Floors</div>
-                  </div>
-
-                  <div className="stat-card-bento d-flex flex-column align-items-center justify-content-center">
-                    <i className="hgi-stroke hgi-layout-grid-01 text-info fs-4"></i>
-                    <div className="stat-card-value" style={{ fontSize: '1.15rem' }}>
-                      {(viewUser.assignedFloors?.length > 0 ? (floors.filter(f => viewUser.assignedFloors.includes(f._id)).reduce((sum, f) => sum + (f.totalSft || 0), 0)) : 0).toLocaleString()}
-                    </div>
-                    <div className="stat-card-label">Managed Area</div>
-                  </div>
-
-                  <div className="stat-card-bento d-flex flex-column align-items-center justify-content-center">
-                    <i className="hgi-stroke hgi-checkmark-circle-02 text-success fs-4"></i>
-                    <div className="stat-card-value text-success" style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>
-                      {viewUser.agreementStatus || 'Active'}
-                    </div>
-                    <div className="stat-card-label">Agreement Status</div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Sub Navigation Tabs */}
-          <div className="bg-white border rounded-4 shadow-sm mb-4 px-3 d-flex flex-wrap flex-row gap-2">
-            {['Overview', 'Agreement Details', 'Payments', 'Permissions', 'Activity Log'].map(tab => (
-              <button 
-                key={tab} 
-                className={`tab-item py-3 ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content Rendering */}
-          {activeTab === 'Overview' && (
-            <div className="row g-4">
-              
-              {/* Left Column - User Details Grid */}
-              <div className="col-lg-6 col-md-12">
-                <div className="detail-card">
-                  <div className="detail-card-header">
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-user text-primary fs-5"></i>
-                      <h5 className="fw-bold mb-0 text-dark">User Information</h5>
-                    </div>
-                    <button onClick={startEditing} className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 px-3 py-1 shadow-sm rounded-pill" style={{ fontSize: '0.8rem' }}>
-                      <i className="hgi-stroke hgi-view me-1"></i> View Profile
-                    </button>
-                  </div>
-                  
-                  <div className="row">
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Full Name</div>
-                      <div className="detail-grid-value">{viewUser.name}</div>
-                    </div>
-                    
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Alternate Contact</div>
-                      <div className="detail-grid-value">{viewUser.emergencyNumber || 'N/A'}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Primary Role</div>
-                      <div className="detail-grid-value">{viewUser.role}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Address</div>
-                      <div className="detail-grid-value">{viewUser.address || 'N/A'}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Official Email</div>
-                      <div className="detail-grid-value">{viewUser.email}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Password</div>
-                      <div className="detail-grid-value d-flex align-items-center gap-2">
-                        <span>{showPassword ? 'N/A (Write-Only)' : '••••••••'}</span>
-                        <i 
-                          className={`hgi-stroke ${showPassword ? 'hgi-view' : 'hgi-view-off-slash'} text-muted cursor-pointer`}
-                          style={{ fontSize: '1.1rem' }}
-                          onClick={() => setShowPassword(!showPassword)}
-                        ></i>
-                      </div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Mobile Number</div>
-                      <div className="detail-grid-value">{viewUser.phoneNumber || 'N/A'}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column - Agreement Summary */}
-              <div className="col-lg-6 col-md-12">
-                <div className="detail-card">
-                  <div className="detail-card-header">
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-document-text text-purple fs-5"></i>
-                      <h5 className="fw-bold mb-0 text-dark">Agreement Summary</h5>
-                    </div>
-                    <button onClick={startEditing} className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 px-3 py-1 shadow-sm rounded-pill" style={{ fontSize: '0.8rem' }}>
-                      <i className="hgi-stroke hgi-document-attachment me-1"></i> View Agreement
-                    </button>
-                  </div>
-                  
-                  <div className="row">
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Agreement Status</div>
-                      <div className="detail-grid-value">
-                        <span className="badge rounded-pill px-3 py-1 bg-success bg-opacity-10 text-success border border-success border-opacity-25" style={{ fontSize: '0.75rem' }}>
-                          {viewUser.agreementStatus || 'Active'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Start Date</div>
-                      <div className="detail-grid-value">
-                        {viewUser.floorAssignmentStartDate ? new Date(viewUser.floorAssignmentStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
-                      </div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Property</div>
-                      <div className="detail-grid-value">{getPropertyNames(viewUser.assignedProperties)}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">End Date</div>
-                      <div className="detail-grid-value">
-                        {viewUser.floorAssignmentEndDate ? new Date(viewUser.floorAssignmentEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
-                      </div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Floor</div>
-                      <div className="detail-grid-value">{getFloorNames(viewUser.assignedFloors)}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Duration</div>
-                      <div className="detail-grid-value">
-                        {getAgreementDuration(viewUser.floorAssignmentStartDate, viewUser.floorAssignmentEndDate)}
-                      </div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Payment Type</div>
-                      <div className="detail-grid-value">{viewUser.paymentType || 'Monthly'}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Monthly Amount</div>
-                      <div className="detail-grid-value">₹ {(viewUser.monthlyManagementAmount || 0).toLocaleString()}</div>
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      {/* Empty space matching layout */}
-                    </div>
-
-                    <div className="col-md-6 detail-grid-item">
-                      <div className="detail-grid-label">Next Due Date</div>
-                      <div className="detail-grid-value text-primary fw-bold">
-                        {getNextDueDate(viewUser.paymentDueDay)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2: Payment History (Left) and Billing Overview/Actions (Right) */}
-              <div className="col-lg-7 col-md-12">
-                <div className="detail-card">
-                  <div className="detail-card-header">
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-credit-card text-primary fs-5"></i>
-                      <h5 className="fw-bold mb-0 text-dark">Payment History</h5>
-                    </div>
-                    <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 px-3 py-1 shadow-sm rounded-pill" style={{ fontSize: '0.8rem' }}>
-                      <i className="hgi-stroke hgi-plus me-1"></i> View All Payments
-                    </button>
-                  </div>
-
-                  <div className="table-responsive">
-                    <table className="table align-middle text-nowrap table-hover mb-0">
-                      <thead>
-                        <tr>
-                          <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Invoice ID</th>
-                          <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Billing Period</th>
-                          <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Amount</th>
-                          <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Due Date</th>
-                          <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Paid Date</th>
-                          <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Status</th>
-                          <th className="bg-light border-0 py-3 text-center text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Receipt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {loadingBilling ? (
-                          <tr>
-                            <td colSpan={7} className="text-center py-4 text-muted">
-                              Loading billing history...
-                            </td>
-                          </tr>
-                        ) : billingData?.invoices && billingData.invoices.length > 0 ? (
-                          billingData.invoices.map((inv: any) => (
-                            <tr key={inv.invoiceId}>
-                              <td className="py-3 fw-bold text-dark" style={{ fontSize: '0.85rem' }}>{inv.invoiceId}</td>
-                              <td className="py-3 text-muted" style={{ fontSize: '0.85rem' }}>{inv.billingPeriod}</td>
-                              <td className="py-3 fw-bold text-dark" style={{ fontSize: '0.85rem' }}>₹ {inv.amount.toLocaleString()}</td>
-                              <td className="py-3 text-muted" style={{ fontSize: '0.85rem' }}>{new Date(inv.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                              <td className="py-3 text-muted" style={{ fontSize: '0.85rem' }}>
-                                {inv.paidDate ? new Date(inv.paidDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-                              </td>
-                              <td className="py-3">
-                                <span className={`badge rounded-pill px-3 py-1 ${inv.status === 'Paid' ? 'bg-success bg-opacity-10 text-success' : 'bg-warning bg-opacity-10 text-warning'}`} style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                  {inv.status}
-                                </span>
-                              </td>
-                              <td className="py-3 text-center">
-                                <a href="#" className="btn btn-link text-primary p-0">
-                                  <i className="hgi-stroke hgi-download-01"></i>
-                                </a>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={7} className="text-center py-4 text-muted">
-                              No billing history available for this profile.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column - Billing Overview & Quick Actions */}
-              <div className="col-lg-5 col-md-12 d-flex flex-column gap-4">
-                
-                {/* Billing Overview Card */}
-                <div className="detail-card">
-                  <div className="detail-card-header">
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-wallet-01 text-success fs-5"></i>
-                      <h5 className="fw-bold mb-0 text-dark">Billing Overview</h5>
-                    </div>
-                  </div>
-
-                  <div className="d-flex flex-column gap-3">
-                    <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                      <span className="text-muted" style={{ fontSize: '0.9rem' }}>Total Billed</span>
-                      <strong className="text-dark" style={{ fontSize: '1rem' }}>
-                        ₹ {billingData?.summary ? billingData.summary.totalBilled.toLocaleString() : '0'}
-                      </strong>
-                    </div>
-
-                    <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                      <span className="text-muted" style={{ fontSize: '0.9rem' }}>Total Paid</span>
-                      <strong className="text-success" style={{ fontSize: '1rem' }}>
-                        ₹ {billingData?.summary ? billingData.summary.totalPaid.toLocaleString() : '0'}
-                      </strong>
-                    </div>
-
-                    <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                      <span className="text-muted" style={{ fontSize: '0.9rem' }}>Pending Amount</span>
-                      <strong className="text-warning" style={{ fontSize: '1rem' }}>
-                        ₹ {billingData?.summary ? billingData.summary.pendingAmount.toLocaleString() : '0'}
-                      </strong>
-                    </div>
-
-                    <div className="d-flex justify-content-between align-items-center py-2">
-                      <span className="text-muted" style={{ fontSize: '0.9rem' }}>Overdue Amount</span>
-                      <strong className="text-danger" style={{ fontSize: '1rem' }}>
-                        ₹ {billingData?.summary ? billingData.summary.overdueAmount.toLocaleString() : '0'}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Actions Card */}
-                <div className="detail-card">
-                  <div className="detail-card-header">
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="hgi-stroke hgi-flash text-primary fs-5"></i>
-                      <h5 className="fw-bold mb-0 text-dark">Quick Actions</h5>
-                    </div>
-                  </div>
-
-                  <div className="d-flex flex-wrap gap-2">
-                    <button onClick={startEditing} className="quick-action-btn flex-grow-1 justify-content-center">
-                      <i className="hgi-stroke hgi-pencil-line-01 text-primary"></i> Edit User
-                    </button>
-                    <button onClick={() => setShowResetPasswordModal(true)} className="quick-action-btn flex-grow-1 justify-content-center">
-                      <i className="hgi-stroke hgi-key-01 text-purple"></i> Reset Password
-                    </button>
-                    <button className="quick-action-btn flex-grow-1 justify-content-center">
-                      <i className="hgi-stroke hgi-download-01 text-success"></i> Download Agreement
-                    </button>
-                    <button onClick={handleSuspendUser} className="quick-action-btn flex-grow-1 justify-content-center border-danger text-danger bg-white">
-                      <i className="hgi-stroke hgi-user-block"></i> {viewUser.agreementStatus === 'Suspended' ? 'Activate User' : 'Suspend User'}
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* ======================== 2.1 AGREEMENT DETAILS TAB ======================== */}
-          {activeTab === 'Agreement Details' && (
-            <div className="text-start">
-              {loadingAgreement ? (
-                <div className="text-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2"></span>Loading agreement data...</div>
-              ) : !agreementData?.agreements?.length ? (
-                <div className="detail-card text-center py-5">
-                  <i className="hgi-stroke hgi-agreement d-block fs-1 text-muted mb-3 opacity-50"></i>
-                  <h6 className="fw-bold text-dark">No Agreements Found</h6>
-                  <p className="text-muted small">No agreement has been created for this user yet.</p>
-                </div>
-              ) : agreementData.agreements.map((agr: any) => (
-                <div key={agr._id} className="mb-4">
-                  {/* Agreement header badge */}
-                  <div className="d-flex align-items-center gap-3 mb-3">
-                    <span className="fw-bold text-primary" style={{ fontSize: '0.9rem' }}>{agr.agreementNumber}</span>
-                    <span className={`badge rounded-pill px-3 py-1 ${
-                      agr.status === 'Paid' ? 'bg-success bg-opacity-10 text-success' :
-                      agr.status === 'Partially Paid' ? 'bg-info bg-opacity-10 text-info' :
-                      agr.status === 'Overdue' || agr.status === 'Expired' ? 'bg-danger bg-opacity-10 text-danger' :
-                      'bg-warning bg-opacity-10 text-warning'
-                    }`} style={{ fontSize: '0.75rem', fontWeight: 700 }}>{agr.status}</span>
-                  </div>
-
-                  <div className="row g-4">
-                    {/* Left: Core Agreement */}
-                    <div className="col-lg-6 col-md-12">
-                      <div className="detail-card h-100">
-                        <div className="detail-card-header">
-                          <div className="d-flex align-items-center gap-2">
-                            <i className="hgi-stroke hgi-agreement text-primary fs-5"></i>
-                            <h5 className="fw-bold mb-0 text-dark">Agreement Configuration</h5>
-                          </div>
-                        </div>
-                        <div className="row">
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">Company / Entity Name</div>
-                            <div className="detail-grid-value fw-bold text-dark">{agr.companyName || viewUser.companyName || 'Individual'}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">Tenant Type</div>
-                            <div className="detail-grid-value text-capitalize">{agr.tenantType || viewUser.tenantType || 'Individual'}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">GST / PAN Number</div>
-                            <div className="detail-grid-value text-uppercase fw-semibold">{agr.gstPan || viewUser.gstPan || '—'}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">Payment Type</div>
-                            <div className="detail-grid-value fw-semibold text-primary">{agr.paymentType}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">Start Date</div>
-                            <div className="detail-grid-value text-dark fw-semibold">{agr.startDate ? new Date(agr.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">End Date</div>
-                            <div className="detail-grid-value text-dark fw-semibold">{agr.endDate ? new Date(agr.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">Contract Duration</div>
-                            <div className="detail-grid-value text-dark">{agr.startDate && agr.endDate ? getAgreementDuration(agr.startDate, agr.endDate) : '—'}</div>
-                          </div>
-                          <div className="col-md-6 detail-grid-item">
-                            <div className="detail-grid-label">Payment Due Day</div>
-                            <div className="detail-grid-value text-dark">Day {agr.paymentDueDay || 5} of every month</div>
-                          </div>
-                          {agr.remarks && (
-                            <div className="col-md-12 detail-grid-item">
-                              <div className="detail-grid-label">Remarks</div>
-                              <div className="detail-grid-value text-muted small">{agr.remarks}</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Financial Summary */}
-                    <div className="col-lg-6 col-md-12">
-                      <div className="detail-card h-100">
-                        <div className="detail-card-header">
-                          <div className="d-flex align-items-center gap-2">
-                            <i className="hgi-stroke hgi-wallet-01 text-success fs-5"></i>
-                            <h5 className="fw-bold mb-0 text-dark">Financial Summary</h5>
-                          </div>
-                        </div>
-                        <div className="d-flex flex-column gap-3 mt-1">
-                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Total Agreement Amount</span>
-                            <strong className="text-dark" style={{ fontSize: '1.05rem' }}>₹ {agr.totalAmount?.toLocaleString() || 0}</strong>
-                          </div>
-                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Installment Amount</span>
-                            <strong className="text-primary" style={{ fontSize: '1rem' }}>₹ {agr.installmentAmount?.toLocaleString() || 0}</strong>
-                          </div>
-                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Total Paid</span>
-                            <strong className="text-success" style={{ fontSize: '1rem' }}>₹ {agr.totalPaid?.toLocaleString() || 0}</strong>
-                          </div>
-                          <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-light">
-                            <span className="text-muted" style={{ fontSize: '0.9rem' }}>Pending Balance</span>
-                            <strong className="text-danger" style={{ fontSize: '1.1rem' }}>₹ {agr.pendingAmount?.toLocaleString() || 0}</strong>
-                          </div>
-                          {agr.nextDueDate && (
-                            <div className="d-flex justify-content-between align-items-center py-2">
-                              <span className="text-muted" style={{ fontSize: '0.9rem' }}>Next Due Date</span>
-                              <strong className="text-warning" style={{ fontSize: '0.95rem' }}>{new Date(agr.nextDueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
-                            </div>
-                          )}
-                        </div>
-                        {/* Progress bar */}
-                        <div className="mt-3">
-                          <div className="d-flex justify-content-between small text-muted mb-1">
-                            <span>Payment Progress</span>
-                            <span>{agr.totalAmount > 0 ? Math.round((agr.totalPaid / agr.totalAmount) * 100) : 0}% Cleared</span>
-                          </div>
-                          <div className="progress" style={{ height: '8px', borderRadius: '99px' }}>
-                            <div className="progress-bar bg-success" style={{ width: `${agr.totalAmount > 0 ? Math.min(100, Math.round((agr.totalPaid / agr.totalAmount) * 100)) : 0}%`, borderRadius: '99px' }}></div>
-                          </div>
-                        </div>
-                        {/* Pay Now CTA */}
-                        {agr.pendingAmount > 0 && (
-                          <button className="btn btn-primary w-100 mt-3 fw-bold rounded-3" onClick={() => { setSelectedAgreement(agr); setPaymentAmountInput(String(agr.installmentAmount || agr.pendingAmount)); setShowPaymentModal(true); }}>
-                            <i className="hgi-stroke hgi-wallet-01 me-2"></i>Record Payment  —  ₹{(agr.installmentAmount || agr.pendingAmount).toLocaleString()} Due
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ======================== 2.2 PAYMENTS TAB ======================== */}
-          {activeTab === 'Payments' && (
-            <div className="text-start">
-              {/* Summary Cards */}
-              {agreementData?.summary && (
-                <div className="row g-3 mb-4">
-                  {[
-                    { label: 'Total Agreement', value: agreementData.summary.totalAmount, color: 'text-dark', icon: 'hgi-invoice' },
-                    { label: 'Total Paid', value: agreementData.summary.totalPaid, color: 'text-success', icon: 'hgi-checkmark-circle-02' },
-                    { label: 'Pending Balance', value: agreementData.summary.totalPending, color: 'text-danger', icon: 'hgi-alert-02' },
-                    { label: 'Active Agreements', value: agreementData.summary.activeCount, color: 'text-primary', icon: 'hgi-agreement', isCount: true }
-                  ].map((s, i) => (
-                    <div key={i} className="col-6 col-md-3">
-                      <div className="detail-card py-3 px-3">
-                        <i className={`hgi-stroke ${s.icon} ${s.color} fs-4 mb-2 d-block`}></i>
-                        <div className={`fw-bold ${s.color}`} style={{ fontSize: '1.2rem' }}>{s.isCount ? s.value : `₹ ${(s.value || 0).toLocaleString()}`}</div>
-                        <div className="text-muted small">{s.label}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {loadingAgreement ? (
-                <div className="text-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2"></span>Loading payment history...</div>
-              ) : !agreementData?.agreements?.length ? (
-                <div className="detail-card text-center py-5">
-                  <i className="hgi-stroke hgi-folder-open d-block fs-1 text-muted mb-3 opacity-50"></i>
-                  <h6 className="fw-bold text-dark">No Payment Records</h6>
-                  <p className="text-muted small">No agreement exists for this user. Create an agreement first.</p>
-                </div>
-              ) : agreementData.agreements.map((agr: any) => (
-                <div key={agr._id} className="detail-card mb-4">
-                  <div className="detail-card-header">
-                    <div>
-                      <div className="d-flex align-items-center gap-2">
-                        <i className="hgi-stroke hgi-invoice text-primary fs-5"></i>
-                        <h5 className="fw-bold mb-0 text-dark">Payment History — {agr.agreementNumber}</h5>
-                      </div>
-                      <div className="text-muted small mt-1">{agr.paymentType} · Total: ₹{agr.totalAmount?.toLocaleString()} · Pending: <span className="text-danger fw-bold">₹{agr.pendingAmount?.toLocaleString()}</span></div>
-                    </div>
-                    {agr.pendingAmount > 0 && (
-                      <button className="btn btn-primary btn-sm px-4 fw-bold rounded-pill" onClick={() => { setSelectedAgreement(agr); setPaymentAmountInput(String(agr.installmentAmount || agr.pendingAmount)); setShowPaymentModal(true); }}>
-                        + Record Payment
-                      </button>
-                    )}
-                  </div>
-
-                  {agr.payments?.length > 0 ? (
-                    <div className="table-responsive">
-                      <table className="table mb-0 border-0">
-                        <thead>
-                          <tr>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Receipt No.</th>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Payment Date</th>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Amount Paid</th>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Mode</th>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Reference</th>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Notes</th>
-                            <th className="bg-light border-0 py-3 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {agr.payments.map((p: any) => (
-                            <tr key={p._id}>
-                              <td className="py-3 fw-bold text-dark" style={{ fontSize: '0.82rem' }}>{p.receiptNumber || '—'}</td>
-                              <td className="py-3 text-muted" style={{ fontSize: '0.82rem' }}>{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-                              <td className="py-3 fw-bold text-success" style={{ fontSize: '0.9rem' }}>₹ {(p.amountPaid || p.amount || 0).toLocaleString()}</td>
-                              <td className="py-3 text-muted" style={{ fontSize: '0.82rem' }}>{p.paymentMode || '—'}</td>
-                              <td className="py-3 text-muted text-truncate" style={{ fontSize: '0.8rem', maxWidth: '130px' }} title={p.transactionRef}>{p.transactionRef || '—'}</td>
-                              <td className="py-3 text-muted" style={{ fontSize: '0.8rem', maxWidth: '160px' }}>{p.notes || '—'}</td>
-                              <td className="py-3">
-                                <span className={`badge rounded-pill px-3 py-1 ${p.status === 'Confirmed' ? 'bg-success bg-opacity-10 text-success' : 'bg-warning bg-opacity-10 text-warning'}`} style={{ fontSize: '0.72rem', fontWeight: 700 }}>{p.status || 'Confirmed'}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted">
-                      <i className="hgi-stroke hgi-folder-open d-block fs-2 mb-2 opacity-40"></i>
-                      <span className="small">No payments recorded yet for this agreement.</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ======================== 2.3 ACTIVITY LOG TAB ======================== */}
-          {activeTab === 'Activity Log' && (
-            <div className="detail-card text-start">
-              <div className="detail-card-header">
-                <div className="d-flex align-items-center gap-2">
-                  <i className="hgi-stroke hgi-activity-01 text-primary fs-5"></i>
-                  <h5 className="fw-bold mb-0 text-dark">Audit Trails & Activity Log</h5>
-                </div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="timeline-container position-relative py-3">
-                  <div className="timeline-line position-absolute" style={{ left: '19px', top: '0', bottom: '0', width: '2px', backgroundColor: '#e2e8f0', zIndex: 1 }}></div>
-
-                  {/* Account creation event */}
-                  <div className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
-                    <div className="timeline-icon bg-success rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
-                      <i className="hgi-stroke hgi-user-add-01" style={{ fontSize: '0.85rem' }}></i>
-                    </div>
-                    <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
-                      <div className="d-flex justify-content-between align-items-start mb-1">
-                        <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Account Provisioned & Activated</h6>
-                        <span className="text-muted small flex-shrink-0 ms-3">{viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
-                      </div>
-                      <p className="text-muted small mb-0">System access granted for <strong>{viewUser.name}</strong> with role <span className="badge bg-primary bg-opacity-10 text-primary px-2 py-1">{viewUser.role}</span>.</p>
-                    </div>
-                  </div>
-
-                  {/* Spatial assignment events */}
-                  {viewUser.assignedFloors?.length > 0 && (
-                    <div className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
-                      <div className="timeline-icon bg-primary rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
-                        <i className="hgi-stroke hgi-building-03" style={{ fontSize: '0.85rem' }}></i>
-                      </div>
-                      <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
-                        <div className="d-flex justify-content-between align-items-start mb-1">
-                          <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Spatial Mappings Synchronized</h6>
-                          <span className="text-muted small flex-shrink-0 ms-3">{viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString('en-GB') : '—'}</span>
-                        </div>
-                        <p className="text-muted small mb-0">Linked to <strong>{viewUser.assignedFloors.length} floor(s)</strong> and <strong>{viewUser.assignedUnits?.length || 0} unit(s)</strong>.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Agreement events (real data) */}
-                  {agreementData?.agreements?.map((agr: any) => (
-                    <div key={agr._id} className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
-                      <div className="timeline-icon bg-info rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
-                        <i className="hgi-stroke hgi-agreement" style={{ fontSize: '0.85rem' }}></i>
-                      </div>
-                      <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
-                        <div className="d-flex justify-content-between align-items-start mb-1">
-                          <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Agreement Created — {agr.agreementNumber}</h6>
-                          <span className="text-muted small flex-shrink-0 ms-3">{agr.createdAt ? new Date(agr.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
-                        </div>
-                        <p className="text-muted small mb-0"><strong>{agr.paymentType}</strong> agreement for ₹{agr.totalAmount?.toLocaleString()} from {agr.startDate ? new Date(agr.startDate).toLocaleDateString('en-GB') : '?'} to {agr.endDate ? new Date(agr.endDate).toLocaleDateString('en-GB') : '?'}. Current status: <span className="fw-bold">{agr.status}</span>.</p>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Payment events (real data) */}
-                  {agreementData?.agreements?.flatMap((agr: any) => agr.payments || []).sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()).map((p: any) => (
-                    <div key={p._id} className="timeline-item d-flex gap-4 mb-4 position-relative" style={{ zIndex: 2 }}>
-                      <div className="timeline-icon bg-purple rounded-circle d-flex align-items-center justify-content-center text-white shadow flex-shrink-0" style={{ width: '40px', height: '40px', border: '4px solid #fff' }}>
-                        <i className="hgi-stroke hgi-wallet-01" style={{ fontSize: '0.85rem' }}></i>
-                      </div>
-                      <div className="timeline-content bg-light p-3 rounded-4 flex-grow-1">
-                        <div className="d-flex justify-content-between align-items-start mb-1">
-                          <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Payment Recorded — {p.receiptNumber || 'N/A'}</h6>
-                          <span className="text-muted small flex-shrink-0 ms-3">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
-                        </div>
-                        <p className="text-muted small mb-0">₹{(p.amountPaid || p.amount || 0).toLocaleString()} paid via <strong>{p.paymentMode}</strong>{p.transactionRef ? ` · Ref: ${p.transactionRef}` : ''}. {p.notes || ''}</p>
-                      </div>
-                    </div>
-                  ))}
-
-                  {!agreementData?.agreements?.length && (
-                    <div className="text-center text-muted small py-3">No agreement or payment activity recorded yet.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ======================== 2.4 PERMISSIONS TAB ======================== */}
-          {activeTab === 'Permissions' && (
-            <div className="detail-card text-start">
-              <div className="detail-card-header">
-                <div className="d-flex align-items-center gap-2">
-                  <i className="hgi-stroke hgi-shield-lock text-primary fs-5"></i>
-                  <h5 className="fw-bold mb-0 text-dark">Role Clearances & Permissions</h5>
-                </div>
-              </div>
-              <div className="row g-3 p-2">
-                {[
-                  { name: 'System Login', desc: 'Authenticate into the admin portal.', active: true },
-                  { name: 'Provision Accounts', desc: 'Create and provision subordinate user accounts.', active: viewUser.role === 'SUPER_ADMIN' },
-                  { name: 'Financial Control', desc: 'Generate invoices and record maintenance payments.', active: ['SUPER_ADMIN', 'OFFICE_OWNER'].includes(viewUser.role) },
-                  { name: 'Helpdesk & AMC Response', desc: 'Resolve complaints and coordinate maintenance.', active: ['SUPER_ADMIN', 'FLOOR_ADMIN', 'STAFF_ADMIN'].includes(viewUser.role) },
-                  { name: 'Visitor Approval', desc: 'Approve gate passes and view visitor logs.', active: true },
-                  { name: 'Spatial Config', desc: 'Add properties, floors, and units to the database.', active: viewUser.role === 'SUPER_ADMIN' },
-                  { name: 'Agreement Management', desc: 'Create and manage tenant agreements.', active: ['SUPER_ADMIN', 'FLOOR_ADMIN'].includes(viewUser.role) },
-                  { name: 'Reports Access', desc: 'View collection and due management reports.', active: ['SUPER_ADMIN', 'FLOOR_ADMIN'].includes(viewUser.role) }
-                ].map((perm, idx) => (
-                  <div key={idx} className="col-md-6">
-                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 border">
-                      <div>
-                        <h6 className="fw-bold text-dark mb-1" style={{ fontSize: '0.85rem' }}>{perm.name}</h6>
-                        <p className="text-muted small mb-0" style={{ fontSize: '0.75rem', maxWidth: '260px' }}>{perm.desc}</p>
-                      </div>
-                      <span className={`badge rounded-pill px-3 py-1 flex-shrink-0 ms-2 ${perm.active ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary'}`} style={{ fontSize: '0.7rem', fontWeight: 700 }}>
-                        {perm.active ? 'Authorized' : 'Restricted'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
+        /* ======================== 2. PREMIUM DETAILS VIEW ======================== */
+        <UserDetailView
+          viewUser={viewUser}
+          agreementData={agreementData}
+          loadingAgreement={loadingAgreement}
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
+          onBack={() => setViewUser(null)}
+          onStartEditing={startEditing}
+          onSuspend={handleSuspendUser}
+          onResetPassword={() => setShowResetPasswordModal(true)}
+          onRecordPayment={(agr, amount) => {
+            setSelectedAgreement(agr);
+            setPaymentAmountInput(amount);
+            setShowPaymentModal(true);
+          }}
+          generateInstallments={generateInstallments}
+          getPropertyNames={getPropertyNames}
+          getFloorNames={getFloorNames}
+          getAgreementDuration={getAgreementDuration}
+          getNextDueDate={getNextDueDate}
+        />
       )}
 
-      {/* ======================== 3. EDIT USER SIDE DRAWER MODAL ======================== */}
+      {/* â”€â”€ Modals â”€â”€ */}
       {isEditingUser && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1100, backdropFilter: 'blur(8px)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
-              <div className="modal-header border-0 px-4 py-3 bg-light d-flex align-items-center justify-content-between">
-                <h5 className="fw-bold mb-0 text-dark">Edit User Profile Details</h5>
-                <button type="button" className="btn-close" onClick={() => setIsEditingUser(false)}></button>
-              </div>
-
-              <form onSubmit={handleEditSubmit}>
-                <div className="modal-body p-4" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
-                  <div className="row g-3">
-                    
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Full Name</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        required
-                        value={editForm.name} 
-                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Official Email</label>
-                      <input 
-                        type="email" 
-                        className="form-control" 
-                        required
-                        value={editForm.email} 
-                        onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Mobile Number</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        value={editForm.phoneNumber} 
-                        onChange={e => setEditForm({ ...editForm, phoneNumber: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Alternate/Emergency Contact</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        value={editForm.emergencyNumber} 
-                        onChange={e => setEditForm({ ...editForm, emergencyNumber: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-muted">Residential/Office Address</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        value={editForm.address} 
-                        onChange={e => setEditForm({ ...editForm, address: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Agreement Status</label>
-                      <select 
-                        className="form-select" 
-                        value={editForm.agreementStatus}
-                        onChange={e => setEditForm({ ...editForm, agreementStatus: e.target.value })}
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Suspended">Suspended</option>
-                        <option value="Expired">Expired</option>
-                      </select>
-                    </div>
-
-                    {editForm.role === 'OFFICE_OWNER' || editForm.role === 'Owner' ? (
-                      <>
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold small text-muted">Total Agreement Amount</label>
-                          <input 
-                            type="number" 
-                            className="form-control" 
-                            value={editForm.totalAgreementAmount} 
-                            onChange={e => setEditForm({ ...editForm, totalAgreementAmount: Number(e.target.value) })}
-                          />
-                        </div>
-
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold small text-muted">Payment Type</label>
-                          <select 
-                            className="form-select" 
-                            value={editForm.paymentType}
-                            onChange={e => setEditForm({ ...editForm, paymentType: e.target.value })}
-                          >
-                            <option value="One Time">One Time</option>
-                            <option value="Monthly Installment">Monthly Installment</option>
-                            <option value="Quarterly Installment">Quarterly Installment</option>
-                            <option value="Half-Yearly Installment">Half-Yearly Installment</option>
-                            <option value="Yearly Installment">Yearly Installment</option>
-                            <option value="Custom Installment">Custom Installment</option>
-                          </select>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold small text-muted">Monthly Management Amount</label>
-                          <input 
-                            type="number" 
-                            className="form-control" 
-                            value={editForm.monthlyManagementAmount} 
-                            onChange={e => setEditForm({ ...editForm, monthlyManagementAmount: Number(e.target.value) })}
-                          />
-                        </div>
-
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold small text-muted">Payment Type</label>
-                          <select 
-                            className="form-select" 
-                            value={editForm.paymentType}
-                            onChange={e => setEditForm({ ...editForm, paymentType: e.target.value })}
-                          >
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Yearly">Yearly</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="col-md-4">
-                      <label className="form-label fw-semibold small text-muted">Payment Due Day</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        min="1" 
-                        max="31"
-                        value={editForm.paymentDueDay} 
-                        onChange={e => setEditForm({ ...editForm, paymentDueDay: Number(e.target.value) })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Assignment Start Date</label>
-                      <input 
-                        type="date" 
-                        className="form-control" 
-                        value={editForm.floorAssignmentStartDate} 
-                        onChange={e => setEditForm({ ...editForm, floorAssignmentStartDate: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted">Assignment End Date</label>
-                      <input 
-                        type="date" 
-                        className="form-control" 
-                        value={editForm.floorAssignmentEndDate} 
-                        onChange={e => setEditForm({ ...editForm, floorAssignmentEndDate: e.target.value })}
-                      />
-                    </div>
-
-                  </div>
-                </div>
-
-                <div className="modal-footer border-0 px-4 py-3 bg-light d-flex justify-content-end gap-2">
-                  <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={() => setIsEditingUser(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary rounded-pill px-4" disabled={isSubmittingAction}>
-                    {isSubmittingAction ? 'Updating...' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-
-            </div>
-          </div>
-        </div>
+        <EditUserModal
+          editForm={editForm}
+          setEditForm={setEditForm}
+          onSubmit={handleEditSubmit}
+          onClose={() => setIsEditingUser(false)}
+          isSubmitting={isSubmittingAction}
+        />
       )}
 
-      {/* ======================== 4. RESET PASSWORD MODAL ======================== */}
       {showResetPasswordModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1100, backdropFilter: 'blur(8px)' }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '450px' }}>
-            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
-              <div className="modal-header border-0 px-4 py-3 bg-light d-flex align-items-center justify-content-between">
-                <h5 className="fw-bold mb-0 text-dark">Reset System Password</h5>
-                <button type="button" className="btn-close" onClick={() => setShowResetPasswordModal(false)}></button>
-              </div>
-
-              <form onSubmit={handleResetPassword}>
-                <div className="modal-body p-4">
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold small text-muted">New Account Password</label>
-                    <input 
-                      type="password" 
-                      className="form-control" 
-                      placeholder="Minimum 6 characters"
-                      required
-                      minLength={6}
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                    />
-                  </div>
-                  <span className="text-muted small d-block">
-                    This will immediately encrypt and update the user's password in the database.
-                  </span>
-                </div>
-
-                <div className="modal-footer border-0 px-4 py-3 bg-light d-flex justify-content-end gap-2">
-                  <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={() => setShowResetPasswordModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary rounded-pill px-4" disabled={isSubmittingAction}>
-                    {isSubmittingAction ? 'Resetting...' : 'Update Password'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <ResetPasswordModal
+          onSubmit={handleResetPassword}
+          onClose={() => { setShowResetPasswordModal(false); setNewPassword(''); }}
+          isSubmitting={isSubmittingAction}
+        />
       )}
 
-      {/* ======================== 5. RECORD PAYMENT MODAL ======================== */}
       {showPaymentModal && selectedAgreement && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.72)', zIndex: 1200, backdropFilter: 'blur(10px)' }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '540px' }}>
-            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
-              {/* Header */}
-              <div className="modal-header border-0 px-4 py-3 d-flex align-items-center justify-content-between" style={{ background: 'linear-gradient(135deg, #014aad 0%, #0266e8 100%)' }}>
-                <div className="d-flex align-items-center gap-2 text-white">
-                  <i className="hgi-stroke hgi-wallet-01 fs-5"></i>
-                  <h5 className="fw-bold mb-0">Record Payment</h5>
-                </div>
-                <button type="button" className="btn-close btn-close-white" onClick={() => { setShowPaymentModal(false); setSelectedAgreement(null); }}></button>
-              </div>
-
-              {/* Agreement Summary Banner */}
-              <div className="px-4 py-3" style={{ backgroundColor: '#f0f7ff', borderBottom: '1px solid #dbeafe' }}>
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="text-muted small fw-semibold">AGREEMENT</div>
-                    <div className="fw-bold text-dark">{selectedAgreement.agreementNumber}</div>
-                    <div className="text-muted small">{selectedAgreement.paymentType} · ₹{selectedAgreement.installmentAmount?.toLocaleString()} per installment</div>
-                  </div>
-                  <div className="text-end">
-                    <div className="text-muted small fw-semibold">PENDING BALANCE</div>
-                    <div className="fw-bold text-danger" style={{ fontSize: '1.4rem' }}>₹ {selectedAgreement.pendingAmount?.toLocaleString()}</div>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={handlePaymentSubmit}>
-                <div className="modal-body p-4">
-                  <div className="row g-3">
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Amount Paying (₹) *</label>
-                      <div className="input-group">
-                        <span className="input-group-text bg-light border-end-0 fw-bold text-muted">₹</span>
-                        <input type="number" className="form-control border-start-0" placeholder={String(selectedAgreement.installmentAmount || selectedAgreement.pendingAmount)} value={paymentAmountInput} onChange={e => setPaymentAmountInput(e.target.value)} required min="1" max={selectedAgreement.pendingAmount} />
-                      </div>
-                      <div className="form-text text-muted" style={{ fontSize: '0.73rem' }}>Max: ₹{selectedAgreement.pendingAmount?.toLocaleString()}</div>
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Payment Date *</label>
-                      <input type="date" className="form-control" value={paymentDateInput} onChange={e => setPaymentDateInput(e.target.value)} required max={new Date().toISOString().split('T')[0]} />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Payment Mode *</label>
-                      <div className="d-flex flex-wrap gap-2">
-                        {['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'].map(mode => (
-                          <button key={mode} type="button" className={`btn btn-sm px-3 py-2 rounded-pill fw-semibold ${paymentModeInput === mode ? 'btn-primary shadow-sm' : 'btn-outline-secondary'}`} style={{ fontSize: '0.8rem' }} onClick={() => setPaymentModeInput(mode)}>
-                            {mode}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Transaction / Reference No.</label>
-                      <input type="text" className="form-control" placeholder="e.g. UTR123456789, CHQ-00421" value={transactionRefInput} onChange={e => setTransactionRefInput(e.target.value)} />
-                      <div className="form-text text-muted" style={{ fontSize: '0.73rem' }}>Auto-generated receipt if left blank.</div>
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-muted text-uppercase" style={{ letterSpacing: '0.05em' }}>Notes / Remarks</label>
-                      <textarea className="form-control" rows={2} placeholder="e.g. Paid via NEFT, partial payment for June" value={notesInput} onChange={e => setNotesInput(e.target.value)} />
-                    </div>
-
-                  </div>
-                </div>
-
-                <div className="modal-footer border-0 px-4 py-3 bg-light d-flex justify-content-end gap-2">
-                  <button type="button" className="btn btn-outline-secondary rounded-pill px-4" onClick={() => { setShowPaymentModal(false); setSelectedAgreement(null); }}>Cancel</button>
-                  <button type="submit" className="btn btn-primary rounded-pill px-4 fw-bold d-flex align-items-center gap-2" disabled={isSubmittingPayment}>
-                    {isSubmittingPayment ? (<><span className="spinner-border spinner-border-sm"></span> Recording...</>) : (<><i className="hgi-stroke hgi-checkmark-circle-02"></i> Confirm Payment</>)}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <RecordPaymentModal
+          agreement={selectedAgreement}
+          amountInput={paymentAmountInput}
+          setAmountInput={setPaymentAmountInput}
+          dateInput={paymentDateInput}
+          setDateInput={setPaymentDateInput}
+          modeInput={paymentModeInput}
+          setModeInput={setPaymentModeInput}
+          refInput={transactionRefInput}
+          setRefInput={setTransactionRefInput}
+          notesInput={notesInput}
+          setNotesInput={setNotesInput}
+          onSubmit={handlePaymentSubmit}
+          onClose={() => { setShowPaymentModal(false); setSelectedAgreement(null); }}
+          isSubmitting={isSubmittingPayment}
+        />
       )}
 
     </div>

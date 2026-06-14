@@ -5,6 +5,22 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import OwnerModal from "@/components/dashboard/OwnerModal";
 
+const formatTimeAMPM = (timeStr?: string) => {
+  if (!timeStr || timeStr === "-") return "—";
+  try {
+    const parts = timeStr.split(":");
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      const ampm = hours >= 12 ? "PM" : "AM";
+      const displayHours = hours % 12 || 12;
+      const displayMinutes = minutes.toString().padStart(2, "0");
+      return `${displayHours}:${displayMinutes} ${ampm}`;
+    }
+  } catch {}
+  return timeStr;
+};
+
 function OwnersContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -294,13 +310,15 @@ function OwnersContent() {
                       <tr key={v._id}>
                         <td className="px-4 py-3">
                           <div className="fw-bold text-dark">{v.visitorName}</div>
-                          <div className="text-muted small">{v.contactNumber}</div>
+                          <div className="text-muted small">{v.visitorContactNumber || v.contactNumber || "—"}</div>
                         </td>
                         <td className="px-4 py-3 text-muted fw-medium">{v.purposeOfVisit}</td>
                         <td className="px-4 py-3"><span className="badge bg-light text-dark border">{v.unit}</span></td>
                         <td className="px-4 py-3 text-end text-muted small">
-                          <div>{new Date(v.createdAt).toLocaleDateString()}</div>
-                          <div>{v.inTime}</div>
+                          <div>Check-In: {v.visitDate ? new Date(v.visitDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""} {formatTimeAMPM(v.inTime)}</div>
+                          {v.outTime && v.outTime !== "-" && (
+                            <div>Check-Out: {v.visitDate ? new Date(v.visitDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""} {formatTimeAMPM(v.outTime)}</div>
+                          )}
                         </td>
                       </tr>
                     ))}

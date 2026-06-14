@@ -15,12 +15,9 @@ interface VisitorModalProps {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ID_PROOF_TYPES  = ["Aadhar", "PAN", "Driving License", "Passport", "Other"];
 const PURPOSE_OPTIONS = ["Meeting", "Delivery", "Interview", "Maintenance", "Personal", "Other"];
-const STATUS_OPTIONS  = ["Pending", "Approved", "Rejected", "Checked-In", "Checked-Out"];
+const STATUS_OPTIONS  = ["Checked-In", "Checked-Out"];
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; icon: string; msg: string }> = {
-  Pending:       { bg: "#fef9c3", color: "#854d0e",  icon: "bi-hourglass-split",   msg: "Awaiting approval — entry not yet permitted." },
-  Approved:      { bg: "#dcfce7", color: "#166534",  icon: "bi-check-circle-fill", msg: "Access granted — visitor may enter." },
-  Rejected:      { bg: "#fee2e2", color: "#991b1b",  icon: "bi-x-circle-fill",     msg: "Entry denied — visitor rejected." },
   "Checked-In":  { bg: "#dbeafe", color: "#1e40af",  icon: "bi-door-open-fill",    msg: "Visitor is currently inside the building." },
   "Checked-Out": { bg: "#f1f5f9", color: "#475569",  icon: "bi-door-closed-fill",  msg: "Visitor has checked out." },
 };
@@ -38,7 +35,7 @@ const EMPTY = {
   idProofType: "Aadhar", idNumber: "", vehicleNumber: "",
   personToMeet: "", purposeOfVisit: "Meeting",
   visitDate: new Date().toISOString().split("T")[0],
-  inTime: "", outTime: "", status: "Pending",
+  inTime: "", outTime: "", status: "Checked-In",
 };
 
 export default function VisitorModal({ isOpen, onClose, onSave, editData, mode }: VisitorModalProps) {
@@ -58,7 +55,7 @@ export default function VisitorModal({ isOpen, onClose, onSave, editData, mode }
     selUnit ? "Office Level" : selFloor ? "Floor Level" : "Property Level";
 
   const apc = APPROVAL_CFG[approvalLevel];
-  const ss  = STATUS_STYLE[formData.status] || STATUS_STYLE["Pending"];
+  const ss  = STATUS_STYLE[formData.status] || STATUS_STYLE["Checked-In"];
   const isRO = mode === "view";
   const set = (k: string, v: any) => setFormData((p: any) => ({ ...p, [k]: v }));
 
@@ -228,13 +225,7 @@ export default function VisitorModal({ isOpen, onClose, onSave, editData, mode }
                 </div>
               )}
 
-              {/* ── STATUS BANNER (non-pending) ───────────────────────────────── */}
-              {formData.status !== "Pending" && (
-                <div style={{ background: ss.bg, border: `1px solid ${ss.color}30`, borderRadius: "10px", padding: "10px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <i className={`bi ${ss.icon}`} style={{ color: ss.color, fontSize: "1rem" }} />
-                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: ss.color }}>{ss.msg}</span>
-                </div>
-              )}
+
 
               {/* ── SECTION 1: Personal Information ──────────────────────────── */}
               <div className="vm-section">Personal Information</div>
@@ -405,6 +396,7 @@ export default function VisitorModal({ isOpen, onClose, onSave, editData, mode }
                   style={{ padding: "8px 20px", borderRadius: "8px", border: "1.5px solid #e2e8f0", background: "#fff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", color: "#64748b" }}>
                   {isRO ? "Close" : "Cancel"}
                 </button>
+
                 {!isRO && (
                   <button type="submit" disabled={isSubmitting}
                     style={{ padding: "8px 24px", borderRadius: "8px", border: "none", background: "#014aad", color: "#fff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>

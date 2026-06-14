@@ -1,327 +1,395 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/utils/api";
-import VendorModal from "@/components/dashboard/VendorModal";
-import { ModalMode } from "@/components/dashboard/AssetModal";
+import Table, { TableColumn } from "@/components/common/Table";
+import VendorFilterDrawer from "@/components/vendors/VendorFilterDrawer";
+import VendorFormModal from "@/components/vendors/VendorFormModal";
+import VendorDetailView from "@/components/vendors/VendorDetailView";
+
+const ITEMS_PER_PAGE = 20;
 
 export default function VendorsPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<ModalMode>("create");
-  const [selectedVendor, setSelectedVendor] = useState<any>(null);
-
-  const [metrics, setMetrics] = useState({ total: 0, active: 0, inactive: 0, contacts: 0 });
+  // ── Server Data ───────────────────────────────────────────────────────────
   const [vendors, setVendors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchVendors();
-    fetchMetrics();
-  }, []);
+  // ── Params (all drive the API call) ───────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [scopeFilter, setScopeFilter] = useState("All");
 
-  const fetchVendors = async () => {
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [showFilters, setShowFilters] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
+  const [detailVendorId, setDetailVendorId] = useState("");
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [selectedVendor, setSelectedVendor] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Debounce search input (500ms) ─────────────────────────────────────────
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(val);
+      setCurrentPage(1);
+    }, 500);
+  };
+
+  // ── Reset page when any filter changes ────────────────────────────────────
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, scopeFilter]);
+
+  // ── Build API query params ────────────────────────────────────────────────
+  const buildParams = useCallback(() => {
+    const params: Record<string, string> = {
+      page: String(currentPage),
+      limit: String(ITEMS_PER_PAGE),
+    };
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (statusFilter !== "All")  params.status = statusFilter;
+    if (scopeFilter !== "All")   params.scopeOfWork = scopeFilter;
+    return new URLSearchParams(params).toString();
+  }, [currentPage, debouncedSearch, statusFilter, scopeFilter]);
+
+  // ── Fetch vendors from backend ────────────────────────────────────────────
+  const fetchVendors = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.get("/vendors");
-      if (response.success) setVendors(response.data);
+      const res = await api.get(`/vendors?${buildParams()}`);
+      if (res.success) {
+        setVendors(res.data);
+        setTotalItems(res.total ?? res.data.length);
+        setTotalPages(res.pages ?? 1);
+      }
     } catch (err) {
       console.error("Failed to fetch vendors:", err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [buildParams]);
 
-  const fetchMetrics = async () => {
+  useEffect(() => { fetchVendors(); }, [fetchVendors]);
+
+  // ── Save (create / edit) ──────────────────────────────────────────────────
+  const handleSave = async (data: any) => {
     try {
-      const response = await api.get("/vendors/stats");
-      if (response.success) setMetrics(response.data);
-    } catch (err) {
-      console.error("Failed to fetch metrics:", err);
-    }
-  };
-
-  const filteredVendors = vendors.filter(
-    v =>
-      (v.vendorName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.vendorCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.contactName || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleOpenModal = (mode: ModalMode, vendor: any = null) => {
-    setModalMode(mode);
-    setSelectedVendor(vendor);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveVendor = async (savedData: any) => {
-    try {
-      const response =
-        modalMode === "edit"
-          ? await api.put(`/vendors/${savedData._id}`, savedData)
-          : await api.post("/vendors", savedData);
-      if (response.success) {
-        fetchVendors();
-        fetchMetrics();
-      }
+      setIsSubmitting(true);
+      const res = modalMode === "edit"
+        ? await api.put(`/vendors/${data._id}`, data)
+        : await api.post("/vendors", data);
+      if (res.success) fetchVendors();
     } catch (err) {
       console.error("Failed to save vendor:", err);
+    } finally {
+      setIsSubmitting(false);
+      setShowModal(false);
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this vendor?")) {
-      try {
-        const response = await api.delete(`/vendors/${id}`);
-        if (response.success) {
-          fetchVendors();
-          fetchMetrics();
-        }
-      } catch (err) {
-        console.error("Failed to delete vendor:", err);
+  // ── Toggle Status ─────────────────────────────────────────────────────────
+  const handleToggleStatus = async (vendor: any) => {
+    const newStatus = vendor.status === "Active" ? "Inactive" : "Active";
+    try {
+      setVendors(prev =>
+        prev.map(v => (v._id === vendor._id ? { ...v, status: newStatus } : v))
+      );
+      const res = await api.put(`/vendors/${vendor._id}`, { status: newStatus });
+      if (!res.success) {
+        fetchVendors();
       }
+    } catch (err) {
+      console.error("Failed to toggle status:", err);
+      fetchVendors();
     }
   };
 
-  // ── Shared thead cell style ────────────────────────────────────────────────
-  const thStyle: React.CSSProperties = {
-    position: "sticky",
-    top: 0,
-    zIndex: 9,
-    fontSize: "0.72rem",
-    backgroundColor: "#1e293b",
-    color: "#ffffff",
-    border: "none",
-    fontWeight: 700,
-    letterSpacing: "0.05em",
-    textTransform: "uppercase",
-    padding: "12px 14px",
-    whiteSpace: "nowrap",
+  // ── Reset all filters ─────────────────────────────────────────────────────
+  const handleReset = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setStatusFilter("All");
+    setScopeFilter("All");
+    setCurrentPage(1);
   };
 
-  return (
-    <div className="container-fluid p-0">
+  // ── Active filter count (for badge) ───────────────────────────────────────
+  const activeFilters = [
+    debouncedSearch.trim() !== "",
+    statusFilter !== "All",
+    scopeFilter !== "All",
+  ].filter(Boolean).length;
 
-      {/* ── Page Header ─────────────────────────────────────────────────────── */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+  // ── Table columns ─────────────────────────────────────────────────────────
+  const columns: TableColumn<any>[] = [
+    {
+      header: "Vendor",
+      render: (v: any) => (
         <div>
-          <h2 className="fw-bold mb-0" style={{ letterSpacing: "-0.02em", fontSize: "1.5rem" }}>
-            Vendor Management
-          </h2>
-          <p className="text-muted small mb-0">View and manage all vendors and contracts</p>
+          <div className="fw-bold text-dark" style={{ fontSize: "0.88rem" }}>{v.vendorName}</div>
+          <div className="text-muted" style={{ fontSize: "0.78rem" }}>{v.vendorCode}</div>
         </div>
-        <div className="d-flex gap-2 align-items-center">
-          <button
-            className="btn btn-outline-secondary btn-sm rounded px-3 fw-bold bg-white shadow-sm d-flex align-items-center gap-2"
-            style={{ fontSize: "0.85rem", height: "36px" }}
-          >
-            <i className="bi bi-download" /> Export
-          </button>
-          <button
-            className="btn btn-sm rounded px-3 shadow-sm fw-bold text-white border-0 d-flex align-items-center gap-2"
-            style={{ backgroundColor: "#014aad", fontSize: "0.85rem", height: "36px" }}
-            onClick={() => handleOpenModal("create")}
-          >
-            <i className="bi bi-plus-circle" /> Add New Vendor
-          </button>
-        </div>
-      </div>
-
-      {/* ── Metric Cards ────────────────────────────────────────────────────── */}
-      <div className="row g-3 mb-4">
-        {[
-          { label: "Total Vendors",    sub: "Registered Vendors",  value: metrics.total,    icon: "bi-people",       color: "#0D6EFD" },
-          { label: "Active Vendors",   sub: "Currently Active",    value: metrics.active,   icon: "bi-person-check", color: "#16a34a" },
-          { label: "Inactive Vendors", sub: "Currently Inactive",  value: metrics.inactive, icon: "bi-person-dash",  color: "#F59E0B" },
-          { label: "Total Contacts",   sub: "Vendor Contacts",     value: metrics.contacts, icon: "bi-envelope",     color: "#0EA5E9" },
-        ].map(({ label, sub, value, icon, color }) => (
-          <div className="col-md-3" key={label}>
-            <div
-              className="bg-white p-3 rounded-4 border shadow-sm d-flex align-items-center gap-3"
-              style={{ borderLeft: `4px solid ${color}` }}
-            >
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{ width: "48px", height: "48px", backgroundColor: `${color}18`, color }}
-              >
-                <i className={`bi ${icon} fs-4`} />
-              </div>
-              <div>
-                <div className="text-muted fw-bold text-uppercase" style={{ fontSize: "0.65rem", letterSpacing: "0.05em" }}>{label}</div>
-                <h3 className="fw-bold mb-0 text-dark" style={{ letterSpacing: "-0.02em" }}>{value}</h3>
-                <div className="text-muted" style={{ fontSize: "0.7rem" }}>{sub}</div>
-              </div>
+      ),
+    },
+    {
+      header: "Scope of Work",
+      render: (v: any) => (
+        <span className="text-muted" style={{
+          fontSize: "0.83rem", maxWidth: 200, display: "block",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {v.scopeOfWork || "—"}
+        </span>
+      ),
+    },
+    {
+      header: "Contact",
+      render: (v: any) => (
+        <div>
+          <div className="fw-semibold text-dark" style={{ fontSize: "0.85rem" }}>{v.contactName}</div>
+          <div className="text-muted" style={{ fontSize: "0.78rem" }}>
+            {v.contactNumber || v.mobileNumber || "—"}
+          </div>
+          {v.emergencyNumber && (
+            <div className="text-muted" style={{ fontSize: "0.75rem" }}>
+              <span className="fw-semibold" style={{ color: "#f59e0b" }}>Emrg: </span>
+              {v.emergencyNumber}
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Search & Filter Bar ──────────────────────────────────────────────── */}
-      <div className="bg-white rounded-3 shadow-sm border px-3 py-2 mb-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
-        {/* Search */}
-        <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ maxWidth: "320px" }}>
-          <i className="bi bi-search text-muted" />
-          <input
-            type="text"
-            className="border-0 bg-transparent w-100 shadow-none small"
-            placeholder="Search by vendor name, code, contact..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{ outline: "none", fontSize: "0.85rem" }}
-          />
+          )}
         </div>
-
-        {/* Dropdowns + Filter */}
-        <div className="d-flex gap-2">
-          <select
-            className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-medium"
-            style={{ fontSize: "0.75rem" }}
-          >
-            <option>Status: All</option>
-            <option>Active</option>
-            <option>Inactive</option>
-          </select>
-          <select
-            className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-medium"
-            style={{ fontSize: "0.75rem" }}
-          >
-            <option>Scope of Work</option>
-          </select>
+      ),
+    },
+    {
+      header: "Email",
+      render: (v: any) => (
+        <span className="text-muted" style={{ fontSize: "0.82rem" }}>{v.emailId || "—"}</span>
+      ),
+    },
+    {
+      header: "Status",
+      render: (v: any) => (
+        <span
+          onClick={() => handleToggleStatus(v)}
+          className={`badge rounded-pill px-3 py-1 ${
+            v.status === "Active"
+              ? "bg-success bg-opacity-10 text-success border border-success border-opacity-25"
+              : "bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25"
+          }`}
+          style={{ fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", userSelect: "none" }}
+          title="Click to toggle status"
+        >
+          {v.status || "Active"}
+        </span>
+      ),
+    },
+    {
+      header: "Actions",
+      style: { textAlign: "center" as const },
+      render: (v: any) => (
+        <div className="d-flex justify-content-center gap-2">
           <button
-            className="btn btn-light btn-sm border rounded-pill px-3 shadow-none fw-bold text-muted d-flex align-items-center gap-2"
-            style={{ fontSize: "0.75rem" }}
+            title="View"
+            onClick={() => { setDetailVendorId(v._id); setShowDetail(true); }}
+            style={{
+              width: 32, height: 32, borderRadius: "6px", border: "1px solid #e2e8f0",
+              background: "#fff", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#1e293b",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
           >
-            <i className="bi bi-funnel" /> Filters
+            <i className="bi bi-eye" style={{ fontSize: "0.9rem" }} />
+          </button>
+          <button
+            title="Edit"
+            onClick={() => { setSelectedVendor(v); setModalMode("edit"); setShowModal(true); }}
+            style={{
+              width: 32, height: 32, borderRadius: "6px", border: "1px solid #e2e8f0",
+              background: "#fff", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#1e293b",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+          >
+            <i className="bi bi-pencil" style={{ fontSize: "0.85rem" }} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div
+      className="p-0 d-flex flex-column bg-white border rounded-4"
+      style={{ height: "calc(100vh - 104px)", fontFamily: "var(--font-geist-sans)", overflow: "hidden" }}
+    >
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div
+        className="d-flex justify-content-between align-items-center pb-2 pt-3 px-4 flex-shrink-0"
+        style={{ backgroundColor: "#ffffff" }}
+      >
+        <span className="fw-bold text-dark" style={{ fontSize: "1rem" }}>Vendor Management</span>
+
+        <div className="d-flex gap-3 align-items-center">
+          {/* Search — debounced, hits backend */}
+          <div className="position-relative" style={{ width: 260 }}>
+            <input
+              type="text"
+              className="form-control px-3 py-2"
+              placeholder="Search name, code, contact..."
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+              style={{ borderRadius: "4px", border: "1px solid #e0e0e0", fontSize: "0.85rem" }}
+            />
+            {searchQuery ? (
+              <button
+                onClick={() => handleSearchChange("")}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  border: "none", background: "none", cursor: "pointer", color: "#94a3b8",
+                  fontSize: "0.85rem", lineHeight: 1,
+                }}
+              >×</button>
+            ) : (
+              <i className="bi bi-search position-absolute text-muted"
+                style={{ right: 12, top: "50%", transform: "translateY(-50%)", fontSize: "0.8rem" }} />
+            )}
+          </div>
+
+          {/* Filter Toggle */}
+          <button
+            className={`btn border d-flex align-items-center justify-content-center position-relative ${
+              showFilters ? "text-white border-primary" : "bg-white text-dark border-light"
+            }`}
+            onClick={() => setShowFilters(true)}
+            style={{
+              width: 40, height: 40, borderRadius: "4px",
+              backgroundColor: showFilters ? "#014aad" : "#fff",
+            }}
+            title="Advanced Filters"
+          >
+            <i className={`bi bi-funnel ${showFilters ? "text-white" : "text-dark"}`} />
+            {activeFilters > 0 && (
+              <span
+                className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+                style={{ fontSize: "0.6rem", padding: "2px 5px" }}
+              >
+                {activeFilters}
+              </span>
+            )}
+          </button>
+
+          {/* Add Vendor */}
+          <button
+            className="btn d-flex align-items-center gap-2 px-4"
+            style={{
+              backgroundColor: "#014aad", color: "#fff", fontWeight: 500,
+              borderRadius: "4px", height: 40, fontSize: "0.85rem", border: "none",
+            }}
+            onClick={() => { setSelectedVendor(null); setModalMode("create"); setShowModal(true); }}
+          >
+            <i className="bi bi-plus-lg" /> Add Vendor
           </button>
         </div>
       </div>
 
-      {/* ── Table ───────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-3 shadow-sm border overflow-hidden">
-        <div className="table-responsive">
-          <table className="table mb-0 align-middle" style={{ width: "100%", borderCollapse: "collapse" }}>
-
-            <thead>
-              <tr>
-                <th style={{ ...thStyle, width: "50px" }}>S.NO</th>
-                <th style={thStyle}>Vendor Code</th>
-                <th style={thStyle}>Vendor Name</th>
-                <th style={thStyle}>Address</th>
-                <th style={thStyle}>Contact Name</th>
-                <th style={thStyle}>Mobile Number</th>
-                <th style={thStyle}>Status</th>
-                <th style={{ ...thStyle, textAlign: "center" }}>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-5 text-muted">
-                    <div className="spinner-border spinner-border-sm me-2" role="status" />
-                    Loading vendors...
-                  </td>
-                </tr>
-              ) : filteredVendors.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-5 text-muted" style={{ fontSize: "0.9rem" }}>
-                    <i className="bi bi-inbox me-2" />No vendors found.
-                  </td>
-                </tr>
-              ) : (
-                filteredVendors.map((vendor, index) => (
-                  <tr
-                    key={vendor._id}
-                    style={{
-                      backgroundColor: index % 2 === 0 ? "#ffffff" : "#f8fafc",
-                      borderBottom: "1px solid #f1f5f9",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    <td style={{ padding: "10px 14px", color: "#6b7280" }}>{index + 1}</td>
-                    <td style={{ padding: "10px 14px", fontWeight: 700 }}>{vendor.vendorCode}</td>
-                    <td style={{ padding: "10px 14px", fontWeight: 600, color: "#1e293b" }}>{vendor.vendorName}</td>
-                    <td style={{ padding: "10px 14px", color: "#64748b" }}>{vendor.address}</td>
-                    <td style={{ padding: "10px 14px" }}>{vendor.contactName}</td>
-                    <td style={{ padding: "10px 14px", color: "#64748b" }}>{vendor.mobileNumber}</td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <span
-                        className={`badge rounded-pill px-2 py-1 fw-medium ${
-                          vendor.status === "Active"
-                            ? "bg-success bg-opacity-10 text-success"
-                            : "bg-danger bg-opacity-10 text-danger"
-                        }`}
-                        style={{ fontSize: "0.72rem" }}
-                      >
-                        {vendor.status || "Active"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                      <div className="d-flex gap-2 justify-content-center align-items-center">
-                        <button
-                          className="btn btn-link p-0"
-                          title="View"
-                          onClick={() => handleOpenModal("view", vendor)}
-                        >
-                          <i className="bi bi-eye-fill" style={{ fontSize: "1.05rem", color: "#4b5563" }} />
-                        </button>
-                        <button
-                          className="btn btn-link p-0"
-                          title="Edit"
-                          onClick={() => handleOpenModal("edit", vendor)}
-                        >
-                          <i className="bi bi-pencil-square" style={{ fontSize: "1.05rem", color: "#014aad" }} />
-                        </button>
-                        <button
-                          className="btn btn-link p-0"
-                          title="Delete"
-                          onClick={() => handleDelete(vendor._id)}
-                        >
-                          <i className="bi bi-trash3" style={{ fontSize: "1.05rem", color: "#dc2626" }} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-
-          </table>
+      {/* Active filter chips */}
+      {activeFilters > 0 && (
+        <div className="d-flex align-items-center gap-2 px-4 pb-2 flex-shrink-0 flex-wrap">
+          {debouncedSearch && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Search: <strong>{debouncedSearch}</strong>
+              <button onClick={() => handleSearchChange("")} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          {statusFilter !== "All" && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Status: <strong>{statusFilter}</strong>
+              <button onClick={() => setStatusFilter("All")} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          {scopeFilter !== "All" && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Scope: <strong>{scopeFilter}</strong>
+              <button onClick={() => setScopeFilter("All")} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          <button
+            onClick={handleReset}
+            className="btn btn-link p-0 text-danger"
+            style={{ fontSize: "0.75rem", textDecoration: "none" }}
+          >
+            Clear all
+          </button>
         </div>
+      )}
 
-        {/* ── Pagination Footer ───────────────────────────────────────────── */}
-        <div className="px-4 py-3 border-top d-flex justify-content-between align-items-center bg-white">
-          <span className="text-muted small">
-            Showing 1–{filteredVendors.length} of {metrics.total} entries
-          </span>
-          <div className="d-flex gap-1">
-            <button className="btn btn-sm btn-white border px-2 shadow-none" disabled>
-              <i className="bi bi-chevron-left" />
-            </button>
-            <button
-              className="btn btn-sm border-0 px-3 shadow-none text-white fw-bold"
-              style={{ backgroundColor: "#014aad", borderRadius: "6px" }}
-            >
-              1
-            </button>
-            <button className="btn btn-sm btn-white border px-2 shadow-none">
-              <i className="bi bi-chevron-right" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Vendor Modal ────────────────────────────────────────────────────── */}
-      <VendorModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveVendor}
-        editData={selectedVendor}
-        mode={modalMode}
+      {/* ── Filter Drawer ─────────────────────────────────────────────────── */}
+      <VendorFilterDrawer
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        searchQuery={searchQuery}
+        setSearchQuery={handleSearchChange}
+        statusFilter={statusFilter}
+        setStatusFilter={v => { setStatusFilter(v); setCurrentPage(1); }}
+        scopeFilter={scopeFilter}
+        setScopeFilter={v => { setScopeFilter(v); setCurrentPage(1); }}
+        onReset={handleReset}
       />
 
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
+      <Table
+        columns={columns}
+        data={vendors}
+        isLoading={isLoading}
+        loadingMessage="Fetching vendors..."
+        emptyMessage={
+          activeFilters > 0
+            ? "No vendors match the current filters."
+            : "No vendors found. Add your first vendor."
+        }
+        containerClassName="table-responsive-container table-responsive flex-grow-1"
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setCurrentPage}
+      />
+
+      {/* ── Detail View ───────────────────────────────────────────────────── */}
+      {showDetail && detailVendorId && (
+        <VendorDetailView
+          vendorId={detailVendorId}
+          onClose={() => { setShowDetail(false); setDetailVendorId(""); }}
+          onEdit={() => {
+            const v = vendors.find(x => x._id === detailVendorId);
+            setSelectedVendor(v || null);
+            setModalMode("edit");
+            setShowDetail(false);
+            setShowModal(true);
+          }}
+        />
+      )}
+
+      {/* ── Form Modal (create / edit) ─────────────────────────────────────── */}
+      {showModal && (
+        <VendorFormModal
+          mode={modalMode}
+          editData={selectedVendor}
+          onSubmit={handleSave}
+          onClose={() => setShowModal(false)}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 }

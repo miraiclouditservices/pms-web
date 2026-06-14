@@ -1,6 +1,26 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { api } from "@/utils/api";
+
+const FIELD_STYLE: React.CSSProperties = {
+  borderRadius: "6px",
+  border: "1px solid #d1d5db",
+  fontSize: "0.88rem",
+  padding: "8px 12px",
+  width: "100%",
+  outline: "none",
+  backgroundColor: "#fff",
+  color: "#111827",
+};
+
+const LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  fontSize: "0.82rem",
+  fontWeight: 600,
+  color: "#374151",
+  marginBottom: 6,
+};
 
 export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
   const [properties, setProperties] = useState<any[]>([]);
@@ -17,6 +37,8 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
     assignedAdmin: "",
     assignedOwner: ""
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -94,182 +116,162 @@ export default function FloorModal({ isOpen, onClose, onSave, editData }: any) {
   const selectedProperty = properties.find(p => p._id === formData.property);
   const floorSft = Number(formData.totalSft) || 0;
   
-  // Sum up capacity (totalSft) of all other floors for this property
   const otherFloorsSft = existingFloors
     .filter(f => !editData || f._id !== editData._id)
     .reduce((sum, f) => sum + (f.totalSft || 0), 0);
   
-  // Available SFT is the property's total SFT minus capacity allocated to other floors
   const trueAvailablePropertySft = selectedProperty 
     ? Math.max(0, (selectedProperty.totalSft || 0) - otherFloorsSft)
     : 0;
     
   const remainingSft = trueAvailablePropertySft - floorSft;
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Clean data before sending to avoid MongoDB CastErrors
     const submitData = { ...formData };
     if (submitData.assignedAdmin === "") submitData.assignedAdmin = null as any;
     if (submitData.assignedOwner === "") submitData.assignedOwner = null as any;
     
-    onSave(submitData);
+    await onSave(submitData);
+    setIsSubmitting(false);
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-      <div className="modal-dialog modal-dialog-centered modal-lg">
-        <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-          {/* Header */}
-          <div className="modal-header bg-light border-0 px-4 py-3">
-            <div className="d-flex align-items-center gap-3">
-              <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
-                <i className="bi bi-layers-fill" style={{ fontSize: '1.2rem' }}></i>
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+    }}>
+      <div className="bg-white rounded-3 shadow-lg overflow-hidden w-100 mx-3" style={{ maxWidth: '800px' }}>
+        {/* Dark Header */}
+        <div className="px-4 py-3 d-flex justify-content-between align-items-center" style={{ backgroundColor: '#2d3748' }}>
+          <h6 className="fw-bold mb-0 text-white" style={{ fontSize: '1rem' }}>
+            {editData ? "Edit Floor Configuration" : "Add New Floor"}
+          </h6>
+          <button type="button" className="btn-close btn-close-white shadow-none" onClick={onClose} style={{ fontSize: '0.8rem' }}></button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="p-4" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+            
+            {/* Property Information Section */}
+            <div className="mb-4">
+              <span className="fw-bold text-dark d-block mb-3" style={{ fontSize: '0.88rem' }}>
+                <i className="bi bi-building text-primary me-2"></i>Property Information
+              </span>
+              <div className="row g-3">
+                <div className="col-12">
+                  <label style={LABEL_STYLE}>Select Property *</label>
+                  <select name="property" value={formData.property} onChange={handleChange} required disabled={!!editData} style={FIELD_STYLE}>
+                    <option value="">Select Property...</option>
+                    {properties.map(p => <option key={p._id} value={p._id}>{p.propertyName}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <h5 className="fw-bold mb-0 text-dark">{editData ? 'Edit Floor' : 'Create New Floor'}</h5>
-                <p className="text-muted small mb-0">Configure floor details and space allocation</p>
+
+              {selectedProperty && (
+                <div className="d-flex flex-wrap gap-3 mt-3 p-3 bg-light rounded border">
+                  <div className="flex-fill">
+                    <div className="text-muted small fw-bold" style={{ fontSize: '0.72rem' }}>Total Property SFT</div>
+                    <div className="fw-bold text-dark" style={{ fontSize: '0.88rem' }}>{selectedProperty.totalSft?.toLocaleString() || 0} SFT</div>
+                  </div>
+                  <div className="flex-fill border-start ps-3">
+                    <div className="text-muted small fw-bold" style={{ fontSize: '0.72rem' }}>Floor-Allocated SFT</div>
+                    <div className="fw-bold text-warning" style={{ fontSize: '0.88rem' }}>{(otherFloorsSft + floorSft).toLocaleString()} SFT</div>
+                  </div>
+                  <div className="flex-fill border-start ps-3">
+                    <div className="text-muted small fw-bold" style={{ fontSize: '0.72rem' }}>Available SFT</div>
+                    <div className="fw-bold text-success" style={{ fontSize: '0.88rem' }}>{(remainingSft < 0 ? 0 : remainingSft).toLocaleString()} SFT</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Floor Details Section */}
+            <div className="mb-4">
+              <span className="fw-bold text-dark d-block mb-3" style={{ fontSize: '0.88rem' }}>
+                <i className="bi bi-ui-checks-grid text-primary me-2"></i>Floor Details
+              </span>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label style={LABEL_STYLE}>Floor Number *</label>
+                  <input type="text" name="floorNumber" value={formData.floorNumber} onChange={handleChange} placeholder="e.g., 5" required style={FIELD_STYLE} />
+                </div>
+                <div className="col-md-6">
+                  <label style={LABEL_STYLE}>Floor Name (Optional)</label>
+                  <input type="text" name="floorName" value={formData.floorName} onChange={handleChange} placeholder="e.g., Fifth Floor" style={FIELD_STYLE} />
+                </div>
+                
+                <div className="col-md-6">
+                  <label style={LABEL_STYLE}>Capacity (SFT) *</label>
+                  <input 
+                    type="number" 
+                    name="totalSft" 
+                    value={formData.totalSft} 
+                    onChange={handleChange} 
+                    placeholder="Enter Capacity" 
+                    min="0"
+                    required 
+                    style={FIELD_STYLE}
+                  />
+                  {floorSft > 0 && floorSft > trueAvailablePropertySft && (
+                    <div className="text-danger small mt-1 fw-bold">
+                      <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                      Exceeds available property space!
+                    </div>
+                  )}
+                </div>
+                
+                <div className="col-md-6">
+                  <label style={LABEL_STYLE}>Status</label>
+                  <select name="status" value={formData.status} onChange={handleChange} style={FIELD_STYLE}>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Maintenance">Maintenance</option>
+                  </select>
+                </div>
+
+                <div className="col-md-6">
+                  <label style={LABEL_STYLE}><i className="bi bi-person-badge-fill text-primary me-2"></i>Assign Floor Admin</label>
+                  <select name="assignedAdmin" value={formData.assignedAdmin} onChange={handleChange} style={FIELD_STYLE}>
+                    <option value="">-- Unassigned --</option>
+                    {admins.map(admin => (
+                      <option key={admin._id} value={admin._id}>{admin.name} ({admin.email})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-6">
+                  <label style={LABEL_STYLE}><i className="bi bi-person-fill text-warning me-2"></i>Assign Floor Owner</label>
+                  <select name="assignedOwner" value={formData.assignedOwner} onChange={handleChange} style={FIELD_STYLE}>
+                    <option value="">-- Unassigned --</option>
+                    {owners.map(owner => (
+                      <option key={owner._id} value={owner._id}>{owner.ownerName}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-            <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
 
-          <div className="modal-body p-4 bg-white">
-            <form onSubmit={handleSubmit}>
-              
-              {/* Property Information Section */}
-              <div className="mb-4">
-                <h6 className="fw-bold text-dark mb-3"><i className="bi bi-building text-primary me-2"></i>Property Information</h6>
-                <div className="row g-3">
-                  <div className="col-12">
-                    <label className="form-label fw-bold small text-muted">Select Property <span className="text-danger">*</span></label>
-                    <select className="form-select border-light-subtle shadow-sm" name="property" value={formData.property} onChange={handleChange} required disabled={!!editData}>
-                      <option value="">Select Property</option>
-                      {properties.map(p => <option key={p._id} value={p._id}>{p.propertyName}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {selectedProperty && (
-                  <div className="d-flex flex-wrap gap-3 mt-3 p-3 bg-light rounded-3 border border-light-subtle">
-                    <div className="flex-fill">
-                      <div className="text-muted small fw-bold">Total Property SFT</div>
-                      <div className="fw-bold fs-5 text-dark">{selectedProperty.totalSft?.toLocaleString() || 0}</div>
-                    </div>
-                    <div className="flex-fill border-start ps-3">
-                      <div className="text-muted small fw-bold">Floor-Allocated SFT</div>
-                      <div className="fw-bold fs-5 text-warning">{(otherFloorsSft + floorSft).toLocaleString()}</div>
-                    </div>
-                    <div className="flex-fill border-start ps-3">
-                      <div className="text-muted small fw-bold">Available SFT</div>
-                      <div className="fw-bold fs-5 text-success">{(remainingSft < 0 ? 0 : remainingSft).toLocaleString()}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Floor Details Section */}
-              <div className="mb-4">
-                <h6 className="fw-bold text-dark mb-3"><i className="bi bi-ui-checks-grid text-primary me-2"></i>Floor Details</h6>
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted">Floor Number <span className="text-danger">*</span></label>
-                    <input type="text" className="form-control border-light-subtle shadow-sm" name="floorNumber" value={formData.floorNumber} onChange={handleChange} placeholder="e.g., 5" required />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted">Floor Name (Optional)</label>
-                    <input type="text" className="form-control border-light-subtle shadow-sm" name="floorName" value={formData.floorName} onChange={handleChange} placeholder="e.g., Fifth Floor" />
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted">Capacity (SFT) <span className="text-danger">*</span></label>
-                    <div className="input-group shadow-sm">
-                      <input 
-                        type="number" 
-                        className="form-control border-light-subtle" 
-                        name="totalSft" 
-                        value={formData.totalSft} 
-                        onChange={handleChange} 
-                        placeholder="Enter Floor Capacity in SFT" 
-                        min="0"
-                        required 
-                      />
-                      <span className="input-group-text bg-light text-muted">SFT</span>
-                    </div>
-                    {floorSft > 0 && floorSft > trueAvailablePropertySft && (
-                      <div className="text-danger small mt-1 fw-bold">
-                        <i className="bi bi-exclamation-triangle-fill me-1"></i>
-                        Exceeds available property space!
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted">Remaining SFT (Auto Calculated)</label>
-                    <div className="input-group shadow-sm">
-                      <input 
-                        type="text" 
-                        className="form-control border-light-subtle bg-light text-muted fw-bold" 
-                        value={remainingSft < 0 ? "0" : remainingSft.toLocaleString()} 
-                        readOnly 
-                      />
-                      <span className="input-group-text bg-light text-muted">SFT</span>
-                    </div>
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted">Status</label>
-                    <select className="form-select border-light-subtle shadow-sm" name="status" value={formData.status} onChange={handleChange}>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                      <option value="Maintenance">Maintenance</option>
-                    </select>
-                  </div>
-
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted"><i className="bi bi-person-badge-fill text-primary me-2"></i>Assign Floor Admin</label>
-                    <select className="form-select border-light-subtle shadow-sm" name="assignedAdmin" value={formData.assignedAdmin} onChange={handleChange}>
-                      <option value="">-- Unassigned --</option>
-                      {admins.map(admin => (
-                        <option key={admin._id} value={admin._id}>{admin.name} ({admin.email})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold small text-muted"><i className="bi bi-person-fill text-warning me-2"></i>Assign Property/Floor Owner</label>
-                    <select className="form-select border-light-subtle shadow-sm" name="assignedOwner" value={formData.assignedOwner} onChange={handleChange}>
-                      <option value="">-- Unassigned --</option>
-                      {owners.map(owner => (
-                        <option key={owner._id} value={owner._id}>{owner.ownerName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="col-12 form-text small text-muted mt-2">
-                    <i className="bi bi-info-circle me-1"></i>Assigning an Admin or Owner grants them specific management access to this floor.
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="d-flex justify-content-end gap-3 mt-4 pt-4 border-top">
-                <button type="button" className="btn btn-light border-light-subtle rounded-pill px-4 fw-bold shadow-sm" onClick={onClose}>Cancel</button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2" 
-                  style={{ backgroundColor: '#014aad', borderColor: '#014aad' }}
-                >
-                  <i className={editData ? "bi bi-check-circle" : "bi bi-plus-circle"}></i> 
-                  {editData ? 'Update Floor' : 'Create Floor'}
-                </button>
-              </div>
-            </form>
+          {/* Footer Actions */}
+          <div className="px-4 py-3 border-top d-flex gap-2 justify-content-end bg-light">
+            <button type="button" className="btn btn-sm btn-outline-secondary fw-bold px-3 py-2" onClick={onClose} disabled={isSubmitting} style={{ fontSize: '0.85rem', borderRadius: '4px' }}>Cancel</button>
+            <button 
+              type="submit" 
+              className="btn btn-sm fw-bold text-white px-4 py-2" 
+              disabled={isSubmitting}
+              style={{ fontSize: '0.85rem', borderRadius: '4px', backgroundColor: '#014aad' }}
+            >
+              {isSubmitting ? "Saving..." : (editData ? 'Update Floor' : 'Create Floor')}
+            </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

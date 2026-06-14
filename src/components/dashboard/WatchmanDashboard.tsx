@@ -39,7 +39,7 @@ export default function WatchmanDashboard({ user }: { user: any }) {
       <div className="d-g4 d-mb">
         <StatCard label="Visitors Today"   value={m.visitorsToday??0}      icon="bi-person-badge"     color={C.green}  sub="Registered today" />
         <StatCard label="Currently Inside" value={m.visitorsCheckedIn??0} icon="bi-door-open-fill"   color={C.blue}   sub="Checked in" />
-        <StatCard label="Pending Entry"    value={m.visitorsPending??0}   icon="bi-hourglass-split"  color={C.yellow} sub="Waiting approval" />
+        <StatCard label="Checked Out"      value={m.visitorsCheckedOut??0} icon="bi-door-closed-fill" color={C.yellow} sub="Checked out today" />
         <StatCard label="Gate Passes"      value={m.gatePassApproved??0} icon="bi-card-checklist"   color={C.teal}   sub="Active passes" />
       </div>
 
@@ -56,7 +56,7 @@ export default function WatchmanDashboard({ user }: { user: any }) {
           <div style={{ display:"flex",gap:20 }}>
             {[
               { l:"Inside Now", v:m.visitorsCheckedIn??0, c:C.green },
-              { l:"Pending", v:m.visitorsPending??0, c:C.yellow },
+              { l:"Checked Out", v:m.visitorsCheckedOut??0, c:C.yellow },
               { l:"Gate Passes", v:m.gatePassApproved??0, c:C.blue },
             ].map((s,i)=>(
               <div key={i} style={{ textAlign:"center" }}>
@@ -101,8 +101,8 @@ export default function WatchmanDashboard({ user }: { user: any }) {
           </div>
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8 }}>
             {[
-              { l:"Approved", v:m.visitorsToday??0, c:C.green },
-              { l:"Pending",  v:m.visitorsPending??0, c:C.yellow },
+              { l:"Expected", v:m.visitorsToday??0, c:C.green },
+              { l:"Checked Out", v:m.visitorsCheckedOut??0, c:C.yellow },
               { l:"Inside",   v:m.visitorsCheckedIn??0, c:C.blue },
             ].map((s,i)=>(
               <div key={i} style={{ background:"#f8fafc",borderRadius:10,padding:"10px 8px",textAlign:"center",border:"1px solid #e2e8f0" }}>
@@ -119,8 +119,8 @@ export default function WatchmanDashboard({ user }: { user: any }) {
         {recentV.length>0
           ? recentV.slice(0,6).map((v:any,i:number)=>(
             <AlertItem key={i}
-              icon={v.status==="Checked-In"?"bi-door-open-fill":v.status==="Approved"?"bi-check-circle-fill":"bi-hourglass-split"}
-              iconColor={v.status==="Checked-In"?C.blue:v.status==="Approved"?C.green:C.yellow}
+              icon={v.status==="Checked-In"?"bi-door-open-fill":"bi-door-closed-fill"}
+              iconColor={v.status==="Checked-In"?C.blue:C.slate}
               title={v.name} sub={`${v.contact} · ${v.property}`} time={<StatusPill status={v.status} />} />
           ))
           : <div style={{ textAlign:"center",padding:"24px 0",color:"#94a3b8" }}>

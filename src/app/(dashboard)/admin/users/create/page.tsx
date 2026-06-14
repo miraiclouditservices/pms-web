@@ -47,17 +47,17 @@ function MultiSelect({ options, selectedIds, onChange, placeholder }: any) {
 
   return (
     <div className="position-relative" ref={wrapperRef}>
-      <div 
-        className="form-control bg-white d-flex flex-wrap align-items-center gap-2 px-3 py-2" 
+      <div
+        className="form-control bg-white d-flex flex-wrap align-items-center gap-2 px-3 py-2"
         style={{ minHeight: '45px', cursor: 'pointer', border: '1px solid #cbd5e1', borderRadius: '8px' }}
         onClick={() => setIsOpen(!isOpen)}
       >
         {selectedItems.length === 0 && <span className="text-muted small">{placeholder}</span>}
         {selectedItems.map((item: any) => (
-          <span 
-            key={item._id} 
-            className="badge bg-light text-dark border d-flex align-items-center gap-1 py-1 px-2 rounded-pill shadow-sm" 
-            style={{ fontWeight: '500', fontSize: '0.8rem' }} 
+          <span
+            key={item._id}
+            className="badge bg-light text-dark border d-flex align-items-center gap-1 py-1 px-2 rounded-pill shadow-sm"
+            style={{ fontWeight: '500', fontSize: '0.8rem' }}
             onClick={(e) => { e.stopPropagation(); handleSelect(item._id); }}
           >
             {item.name} <i className="hgi-stroke hgi-cancel-01 text-muted" style={{ cursor: 'pointer', fontSize: '0.85rem' }}></i>
@@ -65,15 +65,15 @@ function MultiSelect({ options, selectedIds, onChange, placeholder }: any) {
         ))}
         <i className="hgi-stroke hgi-arrow-down-01 ms-auto text-muted" style={{ fontSize: '0.9rem' }}></i>
       </div>
-      
+
       {isOpen && (
         <div className="position-absolute w-100 bg-white border shadow-sm rounded-3 mt-1 py-1" style={{ zIndex: 1000, maxHeight: '200px', overflowY: 'auto' }}>
           {options.length === 0 ? <div className="p-3 text-muted small text-center">No items available.</div> : null}
           {options.map((opt: any) => {
             const isSelected = selectedIds.includes(opt._id);
             return (
-              <div 
-                key={opt._id} 
+              <div
+                key={opt._id}
                 className="px-3 py-2 d-flex align-items-center gap-2"
                 onClick={() => handleSelect(opt._id)}
                 style={{ cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
@@ -93,11 +93,11 @@ function MultiSelect({ options, selectedIds, onChange, placeholder }: any) {
 
 export default function CreateUserPage() {
   const router = useRouter();
-  
+
   // Steps state
   const [currentStep, setCurrentStep] = useState(1);
 
-  const [formData, setFormData] = useState({ 
+  const [formData, setFormData] = useState({
     name: '', email: '', password: '', role: 'FLOOR_ADMIN', permissions: [] as string[],
     assignedProperties: [] as string[], assignedFloors: [] as string[], assignedUnits: [] as string[],
     phoneNumber: '', emergencyNumber: '', address: '',
@@ -106,7 +106,7 @@ export default function CreateUserPage() {
     monthlyManagementAmount: 0, totalAgreementAmount: 0, paymentType: 'Monthly Installment', paymentDueDay: 5,
     agreementStatus: 'Active', remarks: '', staffCategory: 'None'
   });
-  
+
   const [properties, setProperties] = useState<any[]>([]);
   const [floors, setFloors] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
@@ -160,11 +160,14 @@ export default function CreateUserPage() {
           const endDate = new Date(startDate);
           endDate.setFullYear(startDate.getFullYear() + yearsToAdd);
           endDate.setDate(endDate.getDate() - 1);
-          
+
           const yyyy = endDate.getFullYear();
           const mm = String(endDate.getMonth() + 1).padStart(2, '0');
           const dd = String(endDate.getDate()).padStart(2, '0');
           updated.floorAssignmentEndDate = `${yyyy}-${mm}-${dd}`;
+
+          const term = Math.max((endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth()) + 1, 1);
+          updated.totalAgreementAmount = prev.monthlyManagementAmount * term;
         }
       }
       return updated;
@@ -186,11 +189,11 @@ export default function CreateUserPage() {
         const endDate = new Date(startDate);
         endDate.setFullYear(startDate.getFullYear() + yearsToAdd);
         endDate.setDate(endDate.getDate() - 1);
-        
+
         const yyyy = endDate.getFullYear();
         const mm = String(endDate.getMonth() + 1).padStart(2, '0');
         const dd = String(endDate.getDate()).padStart(2, '0');
-        
+
         setFormData(prev => ({
           ...prev,
           floorAssignmentEndDate: `${yyyy}-${mm}-${dd}`
@@ -227,9 +230,9 @@ export default function CreateUserPage() {
     try {
       const res = await api.get('/floors');
       if (res.success) {
-        setFloors(res.data.map((f: any) => ({ 
-          ...f, 
-          name: `${f.property?.propertyName} - ${f.floorName || `Floor ${f.floorNumber}`} (${f.totalSft || 0} SFT)` 
+        setFloors(res.data.map((f: any) => ({
+          ...f,
+          name: `${f.property?.propertyName} - ${f.floorName || `Floor ${f.floorNumber}`} (${f.totalSft || 0} SFT)`
         })));
       }
     } catch (err) { console.error(err); }
@@ -249,19 +252,19 @@ export default function CreateUserPage() {
 
   const validateStep = (stepNumber: number) => {
     const errors: Record<string, string> = {};
-    
+
     if (stepNumber === 1) {
       if (!formData.name.trim()) errors.name = "Full name is required.";
-      
+
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
         errors.email = "Please enter a valid email address.";
       }
-      
+
       if (!formData.password || formData.password.length < 6) {
         errors.password = "Password must be at least 6 characters.";
       }
-      
+
       const phoneRegex = /^[0-9]{10}$/;
       if (!phoneRegex.test(formData.phoneNumber)) {
         errors.phoneNumber = "Phone number must be exactly 10 digits.";
@@ -270,7 +273,7 @@ export default function CreateUserPage() {
       if (formData.emergencyNumber && !phoneRegex.test(formData.emergencyNumber)) {
         errors.emergencyNumber = "Alternate phone number must be exactly 10 digits.";
       }
-      
+
       if (!formData.address.trim()) errors.address = "Address is required.";
     }
 
@@ -303,7 +306,7 @@ export default function CreateUserPage() {
           }
         }
         if (formData.monthlyManagementAmount <= 0) {
-          errors.monthlyManagementAmount = "Monthly management amount must be greater than 0.";
+          errors.monthlyManagementAmount = "Total amount must be greater than 0.";
         }
       }
 
@@ -349,7 +352,7 @@ export default function CreateUserPage() {
       });
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const payload = {
@@ -379,34 +382,34 @@ export default function CreateUserPage() {
   };
 
   // Filters
-  const filteredFloors = formData.assignedProperties.length > 0 
+  const filteredFloors = formData.assignedProperties.length > 0
     ? floors.filter(f => {
-        if (!f.property) return false;
-        const propId = typeof f.property === 'object' ? f.property._id : f.property;
-        return formData.assignedProperties.some((id: string) => String(id) === String(propId));
-      })
+      if (!f.property) return false;
+      const propId = typeof f.property === 'object' ? f.property._id : f.property;
+      return formData.assignedProperties.some((id: string) => String(id) === String(propId));
+    })
     : [];
 
   const filteredUnits = formData.assignedFloors.length > 0
     ? units.filter(u => {
-        if (!u.floor) return false;
-        const floorId = typeof u.floor === 'object' ? u.floor._id : u.floor;
-        return formData.assignedFloors.some((id: string) => String(id) === String(floorId));
-      })
+      if (!u.floor) return false;
+      const floorId = typeof u.floor === 'object' ? u.floor._id : u.floor;
+      return formData.assignedFloors.some((id: string) => String(id) === String(floorId));
+    })
     : [];
 
   // Calculations
   const totalAssignedFloorsCount = formData.assignedFloors.length;
-  
+
   const totalManagedSft = formData.role === 'OFFICE_OWNER'
     ? formData.assignedUnits.reduce((sum, unitId) => {
-        const unit = units.find(u => u._id === unitId);
-        return sum + (unit?.sqft || 0);
-      }, 0)
+      const unit = units.find(u => u._id === unitId);
+      return sum + (unit?.sqft || 0);
+    }, 0)
     : formData.assignedFloors.reduce((sum, floorId) => {
-        const floor = floors.find(f => f._id === floorId);
-        return sum + (floor?.totalSft || 0);
-      }, 0);
+      const floor = floors.find(f => f._id === floorId);
+      return sum + (floor?.totalSft || 0);
+    }, 0);
 
   const getTermMonths = () => {
     if (!formData.floorAssignmentStartDate || !formData.floorAssignmentEndDate) return 12;
@@ -420,30 +423,31 @@ export default function CreateUserPage() {
   const termMonths = getTermMonths();
   const monthlyRate = formData.monthlyManagementAmount || 0;
   const isOwner = formData.role === 'OFFICE_OWNER';
-  
+
   // Calculate cycle payment & total term value
-  const totalAgreementAmt = isOwner ? (formData.totalAgreementAmount || 0) : (monthlyRate * termMonths);
-  
+  const totalAgreementAmt = formData.totalAgreementAmount || (monthlyRate * termMonths);
+
   const getInstallmentAmt = () => {
     if (!isOwner) {
       if (formData.paymentType === 'Quarterly') return monthlyRate * 3;
+      if (formData.paymentType === 'Half-Yearly') return monthlyRate * 6;
       if (formData.paymentType === 'Yearly') return monthlyRate * 12;
       return monthlyRate;
     }
     if (formData.paymentType === 'One Time') return totalAgreementAmt;
     if (formData.paymentType === 'Custom Installment') return 0;
-    
+
     const divisor = formData.paymentType === 'Monthly Installment' ? termMonths
       : formData.paymentType === 'Quarterly Installment' ? Math.ceil(termMonths / 3)
-      : formData.paymentType === 'Half-Yearly Installment' ? Math.ceil(termMonths / 6)
-      : formData.paymentType === 'Yearly Installment' ? Math.ceil(termMonths / 12)
-      : 1;
+        : formData.paymentType === 'Half-Yearly Installment' ? Math.ceil(termMonths / 6)
+          : formData.paymentType === 'Yearly Installment' ? Math.ceil(termMonths / 12)
+            : 1;
     return Math.ceil(totalAgreementAmt / Math.max(1, divisor));
   };
 
   const installmentAmt = getInstallmentAmt();
   const pendingBal = totalAgreementAmt; // 0 paid on creation
-  
+
   const getInitialPayStatus = () => {
     if (totalAgreementAmt === 0) return 'Paid';
     if (formData.floorAssignmentStartDate) {
@@ -460,21 +464,21 @@ export default function CreateUserPage() {
     return 'Pending';
   };
   const initialPayStatus = getInitialPayStatus();
-  
+
   let cyclePayment = monthlyRate;
   if (formData.paymentType === 'Quarterly') {
     cyclePayment = monthlyRate * 3;
   } else if (formData.paymentType === 'Yearly') {
     cyclePayment = monthlyRate * 12;
   }
-  
+
   const totalTermAmount = monthlyRate * termMonths;
 
   const remainingAvailableFloors = floors.filter(f => {
     if (!f.property) return false;
     const propId = typeof f.property === 'object' ? f.property._id : f.property;
-    return formData.assignedProperties.includes(String(propId)) && 
-      !f.assignedAdmin && 
+    return formData.assignedProperties.includes(String(propId)) &&
+      !f.assignedAdmin &&
       !formData.assignedFloors.includes(f._id);
   }).length;
 
@@ -488,10 +492,10 @@ export default function CreateUserPage() {
       `}</style>
 
       {/* Sticky Header Nav */}
-      <div className="position-sticky top-0 w-100 bg-white border-bottom shadow-sm" style={{ padding: '16px 24px', zIndex: 1000 }}>
+      <div className="position-sticky top-0 w-100 bg-white border-bottom" style={{ padding: '16px 24px', zIndex: 1000 }}>
         <div className="d-flex align-items-center justify-content-between mx-auto" style={{ maxWidth: '1200px' }}>
           <div className="d-flex align-items-center gap-3">
-            <Link href="/admin/users" className="btn btn-light border rounded-circle shadow-sm d-flex align-items-center justify-content-center transition-all" style={{ width: '40px', height: '40px' }}>
+            <Link href="/admin/users" className="btn btn-light border rounded-circle d-flex align-items-center justify-content-center transition-all" style={{ width: '40px', height: '40px' }}>
               <i className="hgi-stroke hgi-arrow-left-01 text-dark" style={{ fontSize: '1.1rem' }}></i>
             </Link>
             <div>
@@ -508,12 +512,12 @@ export default function CreateUserPage() {
       </div>
 
       <div className="p-4 mx-auto" style={{ maxWidth: '1200px' }}>
-        
+
         {/* Desktop Header Stepper Wizard */}
-        <div className="card border-0 shadow-sm rounded-4 mb-4 bg-white d-none d-md-block">
+        <div className="card border rounded-4 mb-4 bg-white d-none d-md-block">
           <div className="card-body p-4">
             <div className="d-flex align-items-center justify-content-between">
-              
+
               {/* Step 1 */}
               <div className="d-flex align-items-center gap-2">
                 <div className={`rounded-circle d-flex align-items-center justify-content-center fw-bold ${currentStep === 1 ? 'bg-primary text-white' : 'bg-secondary bg-opacity-10 text-muted'}`} style={{ width: '32px', height: '32px', fontSize: '0.9rem' }}>1</div>
@@ -523,7 +527,7 @@ export default function CreateUserPage() {
                 </div>
               </div>
               <div className="flex-grow-1 mx-3 border-top border-dashed" style={{ borderStyle: 'dashed', borderColor: '#cbd5e1' }}></div>
-              
+
               {/* Step 2 */}
               <div className="d-flex align-items-center gap-2">
                 <div className={`rounded-circle d-flex align-items-center justify-content-center fw-bold ${currentStep === 2 ? 'bg-primary text-white' : 'bg-secondary bg-opacity-10 text-muted'}`} style={{ width: '32px', height: '32px', fontSize: '0.9rem' }}>2</div>
@@ -568,7 +572,7 @@ export default function CreateUserPage() {
         </div>
 
         {/* Mobile/Tablet Header Stepper Wizard Progress */}
-        <div className="d-md-none mb-3 p-3 bg-white rounded-4 shadow-sm border">
+        <div className="d-md-none mb-3 p-3 bg-white rounded-4 border">
           <div className="d-flex justify-content-between align-items-center">
             <span className="small text-muted fw-bold">Step {currentStep} of 5</span>
             <span className="badge bg-primary rounded-pill py-1.5 px-3 fw-bold" style={{ fontSize: '0.75rem' }}>
@@ -586,13 +590,13 @@ export default function CreateUserPage() {
 
         <form onSubmit={handleSubmit}>
           <div className="row g-4">
-            
-            {/* Left Column: Form Steps Card */}
-            <div className="col-lg-8">
-              
+
+            {/* Form Steps Card */}
+            <div className="col-lg-10 mx-auto">
+
               {/* Step 1: Personal Details */}
               {currentStep === 1 && (
-                <div className="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                <div className="card border rounded-4 bg-white mb-4">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-3 mb-4">
                       <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" style={{ width: '42px', height: '42px' }}>
@@ -603,13 +607,13 @@ export default function CreateUserPage() {
                         <p className="text-muted small mb-0">Provide basic credentials and contact information.</p>
                       </div>
                     </div>
-                    
+
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label small fw-bold text-dark mb-1">Full Name *</label>
                         <div className={`d-flex align-items-center form-control bg-white px-3 py-2 ${validationErrors.name ? 'is-invalid' : ''}`} style={{ border: validationErrors.name ? '1px solid var(--bs-danger)' : '1px solid #cbd5e1', borderRadius: '8px', gap: '10px' }}>
                           <i className="hgi-stroke hgi-user text-muted" style={{ fontSize: '1.1rem' }}></i>
-                          <input type="text" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="e.g. Tungana Naveen" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                          <input type="text" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="e.g. Tungana Naveen" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                         </div>
                         {validationErrors.name && <div className="invalid-feedback small d-block mt-1">{validationErrors.name}</div>}
                       </div>
@@ -618,7 +622,7 @@ export default function CreateUserPage() {
                         <label className="form-label small fw-bold text-dark mb-1">Official Email ID *</label>
                         <div className={`d-flex align-items-center form-control bg-white px-3 py-2 ${validationErrors.email ? 'is-invalid' : ''}`} style={{ border: validationErrors.email ? '1px solid var(--bs-danger)' : '1px solid #cbd5e1', borderRadius: '8px', gap: '10px' }}>
                           <i className="hgi-stroke hgi-mail-01 text-muted" style={{ fontSize: '1.1rem' }}></i>
-                          <input type="email" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="office@gmail.com" required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                          <input type="email" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="office@gmail.com" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value.trim() })} />
                         </div>
                         {validationErrors.email && <div className="invalid-feedback small d-block mt-1">{validationErrors.email}</div>}
                       </div>
@@ -627,25 +631,24 @@ export default function CreateUserPage() {
                         <label className="form-label small fw-bold text-dark mb-1">Primary Role *</label>
                         <div className="d-flex align-items-center form-control bg-white px-3 py-2" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', gap: '10px' }}>
                           <i className="hgi-stroke hgi-user-shield-01 text-muted" style={{ fontSize: '1.1rem' }}></i>
-                          <select className="border-0 p-0 w-100 shadow-none text-dark fw-medium" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent', cursor: 'pointer' }} required value={formData.role} 
+                          <select className="border-0 p-0 w-100 shadow-none text-dark fw-medium" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent', cursor: 'pointer' }} required value={formData.role}
                             onChange={(e) => {
                               const r = e.target.value;
-                              setFormData(prev => ({ 
-                                ...prev, 
-                                role: r, 
+                              setFormData(prev => ({
+                                ...prev,
+                                role: r,
                                 staffCategory: r === 'STAFF_ADMIN' ? 'Security' : 'None',
                                 assignedProperties: [], assignedFloors: [], assignedUnits: []
                               }));
-                            }} 
+                            }}
                           >
                             {currentUser?.role === 'FLOOR_ADMIN' ? (
-                              <option value="OFFICE_OWNER">OFFICE_OWNER</option>
+                              <option value="OFFICE_OWNER">Office Owner</option>
                             ) : (
                               <>
-                                <option value="FLOOR_ADMIN">FLOOR_ADMIN</option>
-                                <option value="OFFICE_OWNER">OFFICE_OWNER</option>
-                                <option value="STAFF_ADMIN">STAFF_ADMIN</option>
-                                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                                <option value="FLOOR_ADMIN">Floor Admin</option>
+                                <option value="OFFICE_OWNER">Office Owner</option>
+                                <option value="STAFF_ADMIN">Staff Admin</option>
                               </>
                             )}
                           </select>
@@ -657,8 +660,8 @@ export default function CreateUserPage() {
                           <label className="form-label small fw-bold text-dark mb-1">Staff Category *</label>
                           <div className="d-flex align-items-center form-control bg-white px-3 py-2" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', gap: '10px' }}>
                             <i className="hgi-stroke hgi-user text-muted" style={{ fontSize: '1.1rem' }}></i>
-                            <select className="border-0 p-0 w-100 shadow-none text-dark fw-medium" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent', cursor: 'pointer' }} required value={formData.staffCategory} 
-                              onChange={(e) => setFormData({...formData, staffCategory: e.target.value})} 
+                            <select className="border-0 p-0 w-100 shadow-none text-dark fw-medium" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent', cursor: 'pointer' }} required value={formData.staffCategory}
+                              onChange={(e) => setFormData({ ...formData, staffCategory: e.target.value })}
                             >
                               <option value="Security">Security / Guard</option>
                               <option value="Watchman">Watchman / Caretaker</option>
@@ -678,7 +681,7 @@ export default function CreateUserPage() {
                         <label className="form-label small fw-bold text-dark mb-1">Temporary Password *</label>
                         <div className={`d-flex align-items-center form-control bg-white px-3 py-2 ${validationErrors.password ? 'is-invalid' : ''}`} style={{ border: validationErrors.password ? '1px solid var(--bs-danger)' : '1px solid #cbd5e1', borderRadius: '8px', gap: '10px' }}>
                           <i className="hgi-stroke hgi-lock text-muted" style={{ fontSize: '1.1rem' }}></i>
-                          <input type={showPassword ? "text" : "password"} className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="123456" required minLength={6} value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                          <input type={showPassword ? "text" : "password"} className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="123456" required minLength={6} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
                           <i className={`hgi-stroke ${showPassword ? 'hgi-eye' : 'hgi-eye'} text-muted cursor-pointer`} onClick={() => setShowPassword(!showPassword)} style={{ fontSize: '1.1rem' }}></i>
                         </div>
                         {validationErrors.password && <div className="invalid-feedback small d-block mt-1">{validationErrors.password}</div>}
@@ -692,7 +695,7 @@ export default function CreateUserPage() {
                             <span className="small fw-semibold text-dark">+91</span>
                             <i className="hgi-stroke hgi-arrow-down-01" style={{ fontSize: '0.7rem' }}></i>
                           </span>
-                          <input type="tel" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="08106651649" required value={formData.phoneNumber} onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})} />
+                          <input type="tel" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="08106651649" required value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
                         </div>
                         {validationErrors.phoneNumber && <div className="invalid-feedback small d-block mt-1">{validationErrors.phoneNumber}</div>}
                       </div>
@@ -705,7 +708,7 @@ export default function CreateUserPage() {
                             <span className="small fw-semibold text-dark">+91</span>
                             <i className="hgi-stroke hgi-arrow-down-01" style={{ fontSize: '0.7rem' }}></i>
                           </span>
-                          <input type="tel" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="08106651649" value={formData.emergencyNumber} onChange={(e) => setFormData({...formData, emergencyNumber: e.target.value})} />
+                          <input type="tel" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="08106651649" value={formData.emergencyNumber} onChange={(e) => setFormData({ ...formData, emergencyNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })} />
                         </div>
                         {validationErrors.emergencyNumber && <div className="invalid-feedback small d-block mt-1">{validationErrors.emergencyNumber}</div>}
                       </div>
@@ -714,19 +717,13 @@ export default function CreateUserPage() {
                         <label className="form-label small fw-bold text-dark mb-1">Address *</label>
                         <div className={`d-flex align-items-center form-control bg-white px-3 py-2 ${validationErrors.address ? 'is-invalid' : ''}`} style={{ border: validationErrors.address ? '1px solid var(--bs-danger)' : '1px solid #cbd5e1', borderRadius: '8px', gap: '10px' }}>
                           <i className="hgi-stroke hgi-location-01 text-muted" style={{ fontSize: '1.1rem' }}></i>
-                          <input type="text" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="ohm sri shiva sai mens hostel" required value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
+                          <input type="text" className="border-0 p-0 w-100 shadow-none text-dark" style={{ outline: 'none', fontSize: '0.9rem', backgroundColor: 'transparent' }} placeholder="ohm sri shiva sai mens hostel" required value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
                         </div>
                         {validationErrors.address && <div className="invalid-feedback small d-block mt-1">{validationErrors.address}</div>}
                       </div>
                     </div>
 
-                    {/* Information Banner */}
-                    <div className="p-3 bg-primary bg-opacity-5 rounded-3 border border-primary border-opacity-10 d-flex align-items-start gap-2 mt-4">
-                      <i className="hgi-stroke hgi-shield-01 text-primary mt-0.5" style={{ fontSize: '1.1rem' }}></i>
-                      <span className="small text-secondary" style={{ fontSize: '0.82rem', lineHeight: '1.4' }}>
-                        A temporary password will be shared with the user to login and change it on first access.
-                      </span>
-                    </div>
+
 
                   </div>
                 </div>
@@ -734,7 +731,7 @@ export default function CreateUserPage() {
 
               {/* Step 2: Office Setup */}
               {currentStep === 2 && (
-                <div className="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                <div className="card border rounded-4 bg-white mb-4">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-3 mb-4">
                       <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" style={{ width: '42px', height: '42px' }}>
@@ -758,20 +755,20 @@ export default function CreateUserPage() {
                       <div className="row g-3">
                         <div className="col-12">
                           <label className="form-label small fw-bold text-dark mb-1">Select Property *</label>
-                          <MultiSelect 
-                            options={properties} 
-                            selectedIds={formData.assignedProperties} 
-                            onChange={(ids: any) => setFormData({...formData, assignedProperties: ids, assignedFloors: [], assignedUnits: []})}
+                          <MultiSelect
+                            options={properties}
+                            selectedIds={formData.assignedProperties}
+                            onChange={(ids: any) => setFormData({ ...formData, assignedProperties: ids, assignedFloors: [], assignedUnits: [] })}
                             placeholder="Select Property"
                           />
                           {validationErrors.properties && <div className="text-danger small mt-1">{validationErrors.properties}</div>}
                         </div>
                         <div className="col-12">
                           <label className="form-label small fw-bold text-dark mb-1">Select Floors *</label>
-                          <MultiSelect 
-                            options={filteredFloors} 
-                            selectedIds={formData.assignedFloors} 
-                            onChange={(ids: any) => setFormData({...formData, assignedFloors: ids, assignedUnits: []})}
+                          <MultiSelect
+                            options={filteredFloors}
+                            selectedIds={formData.assignedFloors}
+                            onChange={(ids: any) => setFormData({ ...formData, assignedFloors: ids, assignedUnits: [] })}
                             placeholder="Select Floor"
                           />
                           {validationErrors.floors && <div className="text-danger small mt-1">{validationErrors.floors}</div>}
@@ -779,10 +776,10 @@ export default function CreateUserPage() {
                         {formData.role === 'OFFICE_OWNER' && (
                           <div className="col-12">
                             <label className="form-label small fw-bold text-dark mb-1">Units & Flats (Offices) *</label>
-                            <MultiSelect 
-                              options={filteredUnits} 
-                              selectedIds={formData.assignedUnits} 
-                              onChange={(ids: any) => setFormData({...formData, assignedUnits: ids})}
+                            <MultiSelect
+                              options={filteredUnits}
+                              selectedIds={formData.assignedUnits}
+                              onChange={(ids: any) => setFormData({ ...formData, assignedUnits: ids })}
                               placeholder="Select Offices"
                             />
                             {validationErrors.units && <div className="text-danger small mt-1">{validationErrors.units}</div>}
@@ -797,7 +794,7 @@ export default function CreateUserPage() {
 
               {/* Step 3: Billing & Agreement */}
               {currentStep === 3 && (
-                <div className="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                <div className="card border rounded-4 bg-white mb-4">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-3 mb-4">
                       <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" style={{ width: '42px', height: '42px' }}>
@@ -821,11 +818,11 @@ export default function CreateUserPage() {
                       <div className="row g-3">
                         <div className="col-md-6">
                           <label className="form-label small fw-bold text-dark mb-1">Company / Organization Name</label>
-                          <input type="text" className="form-control py-2 shadow-none" placeholder="e.g. Apex Tech Solutions" value={formData.companyName} onChange={(e) => setFormData({...formData, companyName: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                          <input type="text" className="form-control py-2 shadow-none" placeholder="e.g. Apex Tech Solutions" value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
                         </div>
                         <div className="col-md-6">
                           <label className="form-label small fw-bold text-dark mb-1">Tenant Type</label>
-                          <select className="form-select py-2 shadow-none" value={formData.tenantType} onChange={(e) => setFormData({...formData, tenantType: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                          <select className="form-select py-2 shadow-none" value={formData.tenantType} onChange={(e) => setFormData({ ...formData, tenantType: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
                             <option value="Individual">Individual</option>
                             <option value="Company">Company</option>
                             <option value="Corporate">Corporate</option>
@@ -833,13 +830,13 @@ export default function CreateUserPage() {
                         </div>
                         <div className="col-md-6">
                           <label className="form-label small fw-bold text-dark mb-1">GST / PAN Number</label>
-                          <input type="text" className={`form-control py-2 shadow-none ${validationErrors.gstPan ? 'is-invalid' : ''}`} placeholder="e.g. 22AAAAA0000A1Z5" value={formData.gstPan} onChange={(e) => setFormData({...formData, gstPan: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                          <input type="text" className={`form-control py-2 shadow-none ${validationErrors.gstPan ? 'is-invalid' : ''}`} placeholder="e.g. 22AAAAA0000A1Z5" value={formData.gstPan} onChange={(e) => setFormData({ ...formData, gstPan: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
                           {validationErrors.gstPan && <div className="invalid-feedback small">{validationErrors.gstPan}</div>}
                         </div>
 
                         <div className="col-md-6">
                           <label className="form-label small fw-bold text-dark mb-1">Agreement Status *</label>
-                          <select className="form-select py-2 shadow-none" value={formData.agreementStatus} onChange={(e) => setFormData({...formData, agreementStatus: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                          <select className="form-select py-2 shadow-none" value={formData.agreementStatus} onChange={(e) => setFormData({ ...formData, agreementStatus: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
                             <option value="Active">Active</option>
                             <option value="Pending">Pending</option>
                             <option value="Expired">Expired</option>
@@ -877,7 +874,22 @@ export default function CreateUserPage() {
 
                         <div className="col-md-6">
                           <label className="form-label small fw-bold text-dark mb-1">Floor Assignment End Date *</label>
-                          <input type="date" className={`form-control py-2 shadow-none ${validationErrors.floorAssignmentEndDate ? 'is-invalid' : ''}`} required value={formData.floorAssignmentEndDate} onChange={(e) => setFormData({...formData, floorAssignmentEndDate: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                          <input type="date" className={`form-control py-2 shadow-none ${validationErrors.floorAssignmentEndDate ? 'is-invalid' : ''}`} required value={formData.floorAssignmentEndDate} onChange={(e) => {
+                            const endVal = e.target.value;
+                            setFormData(prev => {
+                              const updated = { ...prev, floorAssignmentEndDate: endVal };
+                              if (prev.floorAssignmentStartDate && endVal) {
+                                const start = new Date(prev.floorAssignmentStartDate);
+                                const end = new Date(endVal);
+                                if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                                  const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+                                  const term = Math.max(diffMonths, 1);
+                                  updated.totalAgreementAmount = prev.monthlyManagementAmount * term;
+                                }
+                              }
+                              return updated;
+                            });
+                          }} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
                           {validationErrors.floorAssignmentEndDate && <div className="invalid-feedback small">{validationErrors.floorAssignmentEndDate}</div>}
                         </div>
 
@@ -885,12 +897,31 @@ export default function CreateUserPage() {
                           <>
                             <div className="col-md-4">
                               <label className="form-label small fw-bold text-dark mb-1">Total Agreement Amount *</label>
-                              <input type="number" className="form-control py-2 shadow-none" required value={formData.totalAgreementAmount} onChange={(e) => setFormData({...formData, totalAgreementAmount: Number(e.target.value)})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                              <input type="number" className="form-control py-2 shadow-none" required value={formData.totalAgreementAmount} onChange={(e) => {
+                                const totalVal = Number(e.target.value);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  totalAgreementAmount: totalVal,
+                                  monthlyManagementAmount: termMonths > 0 ? Math.round(totalVal / termMonths) : totalVal
+                                }));
+                              }} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                            </div>
+
+                            <div className="col-md-4">
+                              <label className="form-label small fw-bold text-dark mb-1">Monthly Amount *</label>
+                              <input type="number" className="form-control py-2 shadow-none" required value={formData.monthlyManagementAmount} onChange={(e) => {
+                                const monthlyVal = Number(e.target.value);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  monthlyManagementAmount: monthlyVal,
+                                  totalAgreementAmount: monthlyVal * termMonths
+                                }));
+                              }} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
                             </div>
 
                             <div className="col-md-4">
                               <label className="form-label small fw-bold text-dark mb-1">Payment Type *</label>
-                              <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({...formData, paymentType: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                              <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
                                 <option value="One Time">One Time</option>
                                 <option value="Monthly Installment">Monthly Installment</option>
                                 <option value="Quarterly Installment">Quarterly Installment</option>
@@ -903,15 +934,35 @@ export default function CreateUserPage() {
                         ) : (
                           <>
                             <div className="col-md-4">
-                              <label className="form-label small fw-bold text-dark mb-1">Monthly Management Amount *</label>
-                              <input type="number" className="form-control py-2 shadow-none" required value={formData.monthlyManagementAmount} onChange={(e) => setFormData({...formData, monthlyManagementAmount: Number(e.target.value)})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                              <label className="form-label small fw-bold text-dark mb-1">Total Amount *</label>
+                              <input type="number" className="form-control py-2 shadow-none" required value={formData.totalAgreementAmount} onChange={(e) => {
+                                const totalVal = Number(e.target.value);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  totalAgreementAmount: totalVal,
+                                  monthlyManagementAmount: termMonths > 0 ? Math.round(totalVal / termMonths) : totalVal
+                                }));
+                              }} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                            </div>
+
+                            <div className="col-md-4">
+                              <label className="form-label small fw-bold text-dark mb-1">Monthly Amount *</label>
+                              <input type="number" className="form-control py-2 shadow-none" required value={formData.monthlyManagementAmount} onChange={(e) => {
+                                const monthlyVal = Number(e.target.value);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  monthlyManagementAmount: monthlyVal,
+                                  totalAgreementAmount: monthlyVal * termMonths
+                                }));
+                              }} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
                             </div>
 
                             <div className="col-md-4">
                               <label className="form-label small fw-bold text-dark mb-1">Payment Type *</label>
-                              <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({...formData, paymentType: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                              <select className="form-select py-2 shadow-none" value={formData.paymentType} onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
                                 <option value="Monthly">Monthly</option>
                                 <option value="Quarterly">Quarterly</option>
+                                <option value="Half-Yearly">Half-Yearly</option>
                                 <option value="Yearly">Yearly</option>
                               </select>
                             </div>
@@ -920,12 +971,33 @@ export default function CreateUserPage() {
 
                         <div className="col-md-4">
                           <label className="form-label small fw-bold text-dark mb-1">Payment Due Day *</label>
-                          <input type="number" className="form-control py-2 shadow-none" required min="1" max="31" value={formData.paymentDueDay} onChange={(e) => setFormData({...formData, paymentDueDay: Number(e.target.value)})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                          <input type="number" className="form-control py-2 shadow-none" required min="1" max="31" value={formData.paymentDueDay} onChange={(e) => setFormData({ ...formData, paymentDueDay: Number(e.target.value) })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                        </div>
+
+                        {/* Payment Calculation Details Panel */}
+                        <div className="col-12 mt-2">
+                          <div className="p-3 bg-light rounded-3 border">
+                            <span className="small text-muted d-block mb-1">Payment Calculation Details (Live Preview)</span>
+                            <div className="d-flex flex-wrap gap-4 text-dark small">
+                              <div>
+                                Lease Term: <strong>{termMonths} months</strong>
+                              </div>
+                              <div>
+                                Total Amount: <strong>₹{(formData.totalAgreementAmount || 0).toLocaleString()}</strong>
+                              </div>
+                              <div>
+                                Monthly Rate: <strong>₹{(formData.monthlyManagementAmount || 0).toLocaleString()} / month</strong>
+                              </div>
+                              <div>
+                                Installment Amount: <strong>₹{(installmentAmt || 0).toLocaleString()}</strong> ({formData.paymentType})
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="col-12">
                           <label className="form-label small fw-bold text-dark mb-1">Remarks / Special Notes</label>
-                          <textarea rows={2} className="form-control py-2 shadow-none" placeholder="Any internal assignment remarks..." value={formData.remarks} onChange={(e) => setFormData({...formData, remarks: e.target.value})} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}></textarea>
+                          <textarea rows={2} className="form-control py-2 shadow-none" placeholder="Any internal assignment remarks..." value={formData.remarks} onChange={(e) => setFormData({ ...formData, remarks: e.target.value })} style={{ borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}></textarea>
                         </div>
                       </div>
                     )}
@@ -936,7 +1008,7 @@ export default function CreateUserPage() {
 
               {/* Step 4: Permissions */}
               {currentStep === 4 && (
-                <div className="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                <div className="card border rounded-4 bg-white mb-4">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-3 mb-3 pb-2 border-bottom">
                       <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" style={{ width: '42px', height: '42px' }}>
@@ -976,7 +1048,7 @@ export default function CreateUserPage() {
 
               {/* Step 5: Review & Confirm */}
               {currentStep === 5 && (
-                <div className="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                <div className="card border rounded-4 bg-white mb-4">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-3 mb-4">
                       <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" style={{ width: '42px', height: '42px' }}>
@@ -989,7 +1061,7 @@ export default function CreateUserPage() {
                     </div>
 
                     <div className="d-flex flex-column gap-4">
-                      
+
                       {/* Section 1: Personal Details */}
                       <div>
                         <h6 className="fw-bold text-primary mb-2 border-bottom pb-1">
@@ -1029,7 +1101,7 @@ export default function CreateUserPage() {
                             <div className="col-12">
                               <span className="text-muted small d-block">Assigned Properties</span>
                               <strong className="text-dark small">
-                                {formData.assignedProperties.length > 0 
+                                {formData.assignedProperties.length > 0
                                   ? properties.filter(p => formData.assignedProperties.includes(p._id)).map(p => p.name).join(', ')
                                   : 'None selected'}
                               </strong>
@@ -1037,7 +1109,7 @@ export default function CreateUserPage() {
                             <div className="col-12">
                               <span className="text-muted small d-block">Assigned Floors</span>
                               <strong className="text-dark small">
-                                {formData.assignedFloors.length > 0 
+                                {formData.assignedFloors.length > 0
                                   ? floors.filter(f => formData.assignedFloors.includes(f._id)).map(f => f.floorName || `Floor ${f.floorNumber}`).join(', ')
                                   : 'None selected'}
                               </strong>
@@ -1046,7 +1118,7 @@ export default function CreateUserPage() {
                               <div className="col-12">
                                 <span className="text-muted small d-block">Assigned Offices (Units)</span>
                                 <strong className="text-dark small">
-                                  {formData.assignedUnits.length > 0 
+                                  {formData.assignedUnits.length > 0
                                     ? units.filter(u => formData.assignedUnits.includes(u._id)).map(u => `Unit ${u.unitNumber}`).join(', ')
                                     : 'None selected'}
                                 </strong>
@@ -1099,7 +1171,7 @@ export default function CreateUserPage() {
                             ) : (
                               <>
                                 <div className="col-sm-4">
-                                  <span className="text-muted small d-block">Monthly Rate</span>
+                                  <span className="text-muted small d-block">Total Amount</span>
                                   <strong className="text-dark small">₹{monthlyRate.toLocaleString()}</strong>
                                 </div>
                                 <div className="col-sm-4">
@@ -1124,28 +1196,28 @@ export default function CreateUserPage() {
 
               {/* Actions Footer */}
               <div className="d-flex justify-content-end gap-3 mt-4">
-                <button 
-                  type="button" 
-                  onClick={handlePrevStep} 
-                  className="btn btn-white border rounded-pill px-4 py-2 fw-bold text-dark shadow-sm bg-white"
+                <button
+                  type="button"
+                  onClick={handlePrevStep}
+                  className="btn btn-white border rounded-pill px-4 py-2 fw-bold text-dark bg-white"
                 >
                   {currentStep === 1 ? 'Cancel' : 'Back'}
                 </button>
-                
+
                 {currentStep < 5 ? (
-                  <button 
-                    type="button" 
-                    onClick={handleNextStep} 
-                    className="btn btn-primary rounded-pill px-4 py-2 fw-bold text-white shadow-sm d-flex align-items-center gap-1"
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="btn btn-primary rounded-pill px-4 py-2 fw-bold text-white d-flex align-items-center gap-1"
                     style={{ backgroundColor: '#014aad', borderColor: '#014aad' }}
                   >
                     <span>Next</span>
                     <i className="hgi-stroke hgi-arrow-right-01" style={{ fontSize: '0.95rem' }}></i>
                   </button>
                 ) : (
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary rounded-pill px-4 py-2 fw-bold text-white shadow-sm" 
+                  <button
+                    type="submit"
+                    className="btn btn-primary rounded-pill px-4 py-2 fw-bold text-white"
                     disabled={isLoading}
                     style={{ backgroundColor: '#014aad', borderColor: '#014aad' }}
                   >
@@ -1157,155 +1229,6 @@ export default function CreateUserPage() {
                 )}
               </div>
 
-            </div>
-
-            {/* Right Column: User Summary Live Panel */}
-            <div className="col-lg-4">
-              <div className="position-sticky" style={{ top: '90px', zIndex: 99 }}>
-                
-                {/* Summary Card */}
-                <div className="card border-0 shadow-lg rounded-4 overflow-hidden bg-white" style={{ border: '1px solid rgba(255,255,255,0.4)' }}>
-                  <div className="p-4 bg-white border-bottom">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary" style={{ width: '40px', height: '40px' }}>
-                        <i className="hgi-stroke hgi-user-group" style={{ fontSize: '1.2rem' }}></i>
-                      </div>
-                      <div>
-                        <h5 className="fw-bold mb-0 text-dark">User Summary</h5>
-                        <span className="text-muted small">Live preview of user configuration</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card-body p-4 bg-white d-flex flex-column gap-3">
-                    
-                    {/* Role Display */}
-                    <div>
-                      <span className="text-muted small fw-bold text-uppercase d-block mb-1" style={{ fontSize: '0.7rem' }}>Role</span>
-                      <div className="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
-                        <i className="hgi-stroke hgi-user-shield-01 text-primary" style={{ fontSize: '1.25rem' }}></i>
-                        <span>{formData.role || 'FLOOR_ADMIN'}</span>
-                      </div>
-                    </div>
-
-                    <hr className="my-1 text-muted opacity-25" />
-
-                    {/* Stat Grid */}
-                    <div className="row g-2">
-                      <div className="col-6">
-                        <div className="p-3 bg-light border rounded-3 text-center">
-                          <span className="text-muted small fw-medium d-block mb-1" style={{ fontSize: '0.75rem' }}>Total Assigned Floors</span>
-                          <div className="fs-4 fw-bold text-primary">{totalAssignedFloorsCount}</div>
-                        </div>
-                      </div>
-                      <div className="col-6">
-                        <div className="p-3 bg-light border rounded-3 text-center">
-                          <span className="text-muted small fw-medium d-block mb-1" style={{ fontSize: '0.75rem' }}>Available Floors Left</span>
-                          <div className="fs-4 fw-bold text-warning">{remainingAvailableFloors}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Total Area */}
-                    <div className="p-3 bg-light border rounded-3 d-flex justify-content-between align-items-center">
-                      <div>
-                        <span className="text-muted small fw-medium d-block" style={{ fontSize: '0.8rem' }}>Total Managed Area</span>
-                        <span className="text-muted" style={{ fontSize: '0.7rem' }}>SFT Allocation</span>
-                      </div>
-                      <div className="text-end">
-                        <span className="fs-5 fw-bold text-dark">{totalManagedSft.toLocaleString()}</span>
-                        <span className="text-muted small fw-semibold ms-1">SFT</span>
-                      </div>
-                    </div>
-
-                    {/* Billing Breakdown */}
-                    {formData.role !== 'STAFF_ADMIN' && formData.role !== 'SUPER_ADMIN' && (
-                      <>
-                        <div className="p-3 bg-light border rounded-3 d-flex flex-column gap-2">
-                          <span className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.7rem' }}>Payment Overview</span>
-                          
-                          <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                            <span className="text-muted small">Billing Cycle</span>
-                            <span className="fw-bold text-dark small">{formData.paymentType}</span>
-                          </div>
-
-                          {isOwner ? (
-                            <>
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Agreement Duration</span>
-                                <span className="fw-bold text-dark small">{termMonths} Months</span>
-                              </div>
-
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Total Agreement Amount</span>
-                                <span className="fw-bold text-success small">₹{totalAgreementAmt.toLocaleString()}</span>
-                              </div>
-
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Pending Balance</span>
-                                <span className="fw-bold text-danger small">₹{pendingBal.toLocaleString()}</span>
-                              </div>
-
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Next Installment Due</span>
-                                <span className="fw-bold text-primary small">₹{installmentAmt.toLocaleString()}</span>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Monthly Rate</span>
-                                <span className="fw-bold text-dark small">₹{monthlyRate.toLocaleString()} / mo</span>
-                              </div>
-
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Pay per Cycle ({formData.paymentType})</span>
-                                <span className="fw-bold text-primary small">₹{cyclePayment.toLocaleString()}</span>
-                              </div>
-
-                              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                                <span className="text-muted small">Total Term Value ({termMonths} mos)</span>
-                                <span className="fw-bold text-success small">₹{totalTermAmount.toLocaleString()}</span>
-                              </div>
-                            </>
-                          )}
-
-                          <div className="p-2 bg-primary bg-opacity-5 rounded mt-1 border border-primary border-opacity-10">
-                            <div className="text-secondary" style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
-                              <i className="hgi-stroke hgi-calendar-01 text-primary me-1"></i>
-                              Due Date: Payments must be paid on or before the <strong className="text-dark">{formData.paymentDueDay || 5}th</strong> day of each billing period.
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Status Badge Row */}
-                        <div className="d-flex align-items-center justify-content-between p-2 border rounded-3 bg-white">
-                          <span className="small fw-semibold text-muted" style={{ fontSize: '0.8rem' }}>Payment Status</span>
-                          <span className="badge rounded-pill px-3 py-1.5 fw-bold" style={{
-                            fontSize: '0.75rem',
-                            backgroundColor: initialPayStatus === 'Paid' ? '#e6f4ea' :
-                                             initialPayStatus === 'Overdue' ? '#fce8e6' : '#fef7e0',
-                            color: initialPayStatus === 'Paid' ? '#137333' :
-                                   initialPayStatus === 'Overdue' ? '#c5221f' : '#b06000'
-                          }}>
-                            {initialPayStatus}
-                          </span>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Validation warning */}
-                    {validationErrors.floorAssignmentEndDate && (
-                      <div className="alert alert-danger d-flex align-items-center gap-2 p-2 rounded-3 mb-0" style={{ fontSize: '0.8rem' }}>
-                        <i className="hgi-stroke hgi-information-circle"></i>
-                        <span>{validationErrors.floorAssignmentEndDate}</span>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-
-              </div>
             </div>
 
           </div>
@@ -1330,19 +1253,19 @@ export default function CreateUserPage() {
               {dialog.type === 'warning' && <i className="hgi-stroke hgi-information-circle text-warning" style={{ fontSize: '3.5rem' }}></i>}
               {dialog.type === 'error' && <i className="hgi-stroke hgi-cancel-01 text-danger" style={{ fontSize: '3.5rem' }}></i>}
             </div>
-            
+
             <h4 className="fw-bold text-dark mb-2">{dialog.title}</h4>
             <p className="text-secondary small mb-4 px-2" style={{ lineHeight: '1.5' }}>{dialog.message}</p>
-            
-            <button 
-              type="button" 
+
+            <button
+              type="button"
               className="btn w-100 py-2 rounded-pill fw-bold text-white shadow-sm"
               onClick={() => setDialog(null)}
               style={{
                 backgroundColor: dialog.type === 'success' ? '#10b981' :
-                                 dialog.type === 'warning' ? '#f59e0b' : '#ef4444',
+                  dialog.type === 'warning' ? '#f59e0b' : '#ef4444',
                 borderColor: dialog.type === 'success' ? '#10b981' :
-                             dialog.type === 'warning' ? '#f59e0b' : '#ef4444'
+                  dialog.type === 'warning' ? '#f59e0b' : '#ef4444'
               }}
             >
               Okay, Continue

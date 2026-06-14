@@ -1,55 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { api } from "@/utils/api";
-import HelpdeskModal from "@/components/dashboard/HelpdeskModal";
-import { ModalMode } from "@/components/dashboard/AssetModal";
+import Table, { TableColumn } from "@/components/common/Table";
+import HelpdeskFormModal from "@/components/helpdesk/HelpdeskFormModal";
+import HelpdeskDetailView from "@/components/helpdesk/HelpdeskDetailView";
+import HelpdeskFilterDrawer from "@/components/helpdesk/HelpdeskFilterDrawer";
 
 export default function HelpdeskPage() {
-  const [userRole, setUserRole] = useState("super_admin");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [technicianFilter, setTechnicianFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [propertyFilter, setPropertyFilter] = useState("All");
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<ModalMode>("create");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
 
   const [metrics, setMetrics] = useState({
     total: 0,
     open: 0,
+    assigned: 0,
     inProgress: 0,
+    waitingResponse: 0,
     resolved: 0,
     closed: 0
   });
 
-  const [complaints, setComplaints] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchComplaints();
-    fetchStats();
-
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         try {
-          const u = JSON.parse(storedUser);
-          setCurrentUser(u);
-          if (u.role === "Admin" || u.role === "SUPER_ADMIN") {
-            setUserRole("super_admin");
-          } else if (u.role === "Owner" || u.role === "OFFICE_OWNER") {
-            setUserRole("technician");
-          } else {
-            setUserRole("viewer");
-          }
+          setCurrentUser(JSON.parse(storedUser));
         } catch (e) {
           console.error(e);
         }
@@ -57,9 +52,18 @@ export default function HelpdeskPage() {
     }
   }, []);
 
+  // Fetch metrics and tickets whenever filters or page change
+  useEffect(() => {
+    fetchStats();
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchTickets();
+  }, [currentPage, searchTerm, statusFilter, priorityFilter, categoryFilter, propertyFilter, currentUser]);
+
   const fetchStats = async () => {
     try {
-      const response = await api.get('/helpdesk/stats');
+      const response = await api.get("/helpdesk/stats");
       if (response.success) {
         setMetrics(response.data);
       }
@@ -68,338 +72,351 @@ export default function HelpdeskPage() {
     }
   };
 
-  const fetchComplaints = async () => {
+  const fetchTickets = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get('/helpdesk');
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: "10",
+        search: searchTerm,
+        status: statusFilter,
+        priority: priorityFilter,
+        category: categoryFilter,
+        property: propertyFilter
+      });
+
+      const response = await api.get(`/helpdesk?${queryParams.toString()}`);
       if (response.success) {
-        setComplaints(response.data);
+        setTickets(response.data);
+        if (response.pagination) {
+          setTotalPages(response.pagination.pages || 1);
+          setTotalItems(response.pagination.total || 0);
+        }
       }
     } catch (err) {
-      console.error("Failed to fetch helpdesk tickets:", err);
+      console.error("Failed to fetch tickets:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Get unique technicians for filter
-  const technicians = Array.from(new Set(complaints.map(c => c.allocatedTo).filter(Boolean)));
-
-  const filteredComplaints = complaints.filter(c => {
-    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "OFFICE_OWNER";
-    if (isOwner) {
-      const matchName = (c.tenant?.tenantName || "").toLowerCase().includes(currentUser.name.toLowerCase()) ||
-                        (c.tenant?.companyName || "").toLowerCase().includes((currentUser.companyName || "").toLowerCase()) ||
-                        (c.allocatedTo || "").toLowerCase().includes(currentUser.name.toLowerCase());
-      const matchCreator = c.createdBy === currentUser._id || c.tenant?.user === currentUser._id;
-      if (!matchName && !matchCreator) return false;
+  const handleOpenModal = (mode: "create" | "view", ticket: any = null) => {
+    if (mode === "create") {
+      setIsCreateOpen(true);
+    } else {
+      setSelectedTicket(ticket);
+      setIsDetailOpen(true);
     }
-
-    const matchesSearch = 
-      (c.ticketNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (c.natureOfComplaint || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.allocatedTo || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "All" || c.status === statusFilter;
-    const matchesTechnician = technicianFilter === "All" || c.allocatedTo === technicianFilter;
-    
-    return matchesSearch && matchesStatus && matchesTechnician;
-  });
-
-  // Calculate pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredComplaints.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredComplaints.length / itemsPerPage);
-
-  const handleOpenModal = (mode: ModalMode, ticket: any = null) => {
-    setModalMode(mode);
-    setSelectedTicket(ticket);
-    setIsModalOpen(true);
   };
 
   const handleSaveTicket = async (savedData: any) => {
     try {
-      let response;
-      if (modalMode === 'edit') {
-        response = await api.put(`/helpdesk/${savedData._id}`, savedData);
-      } else {
-        response = await api.post('/helpdesk', savedData);
-      }
-      
+      const response = await api.post("/helpdesk", savedData);
       if (response.success) {
-        fetchComplaints();
-        fetchStats();
+        await fetchTickets();
+        await fetchStats();
+        setIsCreateOpen(false);
       }
     } catch (err) {
       console.error("Failed to save ticket:", err);
+      throw err;
     }
-    setIsModalOpen(false);
   };
 
-  return (
-    <div className="container-fluid p-0">
-      {/* Header & Role Selector */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h2 className="fw-bold mb-0" style={{ letterSpacing: '-0.02em', fontSize: '1.5rem' }}>Helpdesk & Complaints</h2>
-          <p className="text-muted small mb-0">Manage service requests and monitor resolution times</p>
-        </div>
-        <div className="d-flex gap-3 align-items-center">
 
-          <button className="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-bold" style={{ fontSize: '0.75rem' }}>
-            <i className="bi bi-download me-1"></i> Export Log
+
+  const handleReset = () => {
+    setSearchTerm("");
+    setStatusFilter("All");
+    setPriorityFilter("All");
+    setCategoryFilter("All");
+    setPropertyFilter("All");
+    setCurrentPage(1);
+  };
+
+  const activeFilters = [
+    searchTerm.trim() !== "",
+    statusFilter !== "All",
+    priorityFilter !== "All",
+    categoryFilter !== "All",
+    propertyFilter !== "All"
+  ].filter(Boolean).length;
+
+  const columns: TableColumn<any>[] = [
+    {
+      header: "Ticket ID",
+      render: (item) => (
+        <span className="fw-bold text-primary cursor-pointer" onClick={() => handleOpenModal("view", item)}>
+          {item.ticketId}
+        </span>
+      )
+    },
+    {
+      header: "Title",
+      render: (item) => (
+        <div style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span className="fw-bold text-dark d-block">{item.title}</span>
+          <span className="text-muted extra-small">{item.category}</span>
+        </div>
+      )
+    },
+    {
+      header: "Priority",
+      render: (item) => (
+        <span className={`badge rounded-pill px-2 py-1 border fw-bold ${
+          item.priority === "Critical" ? "bg-danger text-white border-danger" :
+          item.priority === "High" ? "bg-warning text-dark border-warning" :
+          "bg-light text-dark border-secondary"
+        }`}>
+          {item.priority}
+        </span>
+      )
+    },
+    {
+      header: "Property / Floor",
+      render: (item) => (
+        <div>
+          <span className="fw-medium text-dark d-block">{item.property?.propertyName || "-"}</span>
+          <span className="text-muted extra-small">
+            {item.floor?.floorName || (item.floor?.floorNumber ? `Floor ${item.floor.floorNumber}` : "-")}
+          </span>
+        </div>
+      )
+    },
+    {
+      header: "Status",
+      render: (item) => (
+        <span className={`badge rounded-pill px-2 py-1 fw-bold border ${
+          item.status === "OPEN" ? "bg-danger bg-opacity-10 text-danger border-danger" :
+          item.status === "ASSIGNED" ? "bg-info bg-opacity-10 text-info border-info" :
+          item.status === "IN_PROGRESS" ? "bg-warning bg-opacity-10 text-warning border-warning" :
+          item.status === "RESOLVED" ? "bg-success bg-opacity-10 text-success border-success" :
+          "bg-secondary bg-opacity-10 text-secondary border-secondary"
+        }`}>
+          {item.status}
+        </span>
+      )
+    },
+    {
+      header: "Actions",
+      style: { textAlign: "right" as const },
+      render: (item) => (
+        <div className="d-flex justify-content-end align-items-center" onClick={(e) => e.stopPropagation()}>
+          <button
+            title="Open Workspace"
+            onClick={() => handleOpenModal("view", item)}
+            style={{
+              width: 32, height: 32, borderRadius: "6px", border: "1px solid #e2e8f0",
+              background: "#fff", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#1e293b",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+          >
+            <i className="bi bi-eye text-secondary" style={{ fontSize: "0.9rem" }}></i>
           </button>
-          {userRole !== 'viewer' && (
-            <button 
-              className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold text-white border-0" 
-              style={{ backgroundColor: '#014aad', fontSize: '0.75rem' }}
-              onClick={() => handleOpenModal('create')}
+        </div>
+      )
+    }
+  ];
+
+  const canCreateTicket = currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "OFFICE_OWNER" || currentUser?.role === "Tenant";
+
+  return (
+    <div
+      className="p-0 d-flex flex-column bg-white border rounded-4"
+      style={{ height: "calc(100vh - 104px)", fontFamily: "var(--font-geist-sans)", overflow: "hidden" }}
+    >
+      {/* Header */}
+      <div
+        className="d-flex justify-content-between align-items-center pb-2 pt-3 px-4 flex-shrink-0"
+        style={{ backgroundColor: "#ffffff" }}
+      >
+        <div>
+          <span className="fw-bold text-dark" style={{ fontSize: "1rem" }}>Helpdesk & Complaints</span>
+          {/* Very small stats list */}
+          <div className="d-flex gap-3 mt-1 text-muted" style={{ fontSize: "0.72rem" }}>
+            <span>Total: <strong className="text-dark">{metrics.total}</strong></span>
+            <span>·</span>
+            <span className="text-danger">Open: <strong>{metrics.open}</strong></span>
+            <span className="text-primary">Assigned: <strong>{metrics.assigned}</strong></span>
+            <span className="text-warning">In Progress: <strong>{metrics.inProgress}</strong></span>
+            <span>·</span>
+            <span className="text-success">Resolved: <strong>{metrics.resolved}</strong></span>
+          </div>
+        </div>
+
+        <div className="d-flex gap-3 align-items-center">
+          {/* Search bar */}
+          <div className="position-relative" style={{ width: 260 }}>
+            <input
+              type="text"
+              className="form-control px-3 py-2"
+              placeholder="Search by title, ID, category..."
+              value={searchTerm}
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              style={{ borderRadius: "4px", border: "1px solid #e0e0e0", fontSize: "0.85rem" }}
+            />
+            {searchTerm ? (
+              <button
+                onClick={() => { setSearchTerm(""); setCurrentPage(1); }}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  border: "none", background: "none", cursor: "pointer", color: "#94a3b8",
+                  fontSize: "0.85rem", lineHeight: 1,
+                }}
+              >×</button>
+            ) : (
+              <i className="bi bi-search position-absolute text-muted"
+                style={{ right: 12, top: "50%", transform: "translateY(-50%)", fontSize: "0.8rem" }} />
+            )}
+          </div>
+
+          {/* Filter Trigger Button */}
+          <button
+            className={`btn border d-flex align-items-center justify-content-center position-relative ${showFilters ? "text-white border-primary" : "bg-white text-dark border-light"}`}
+            onClick={() => setShowFilters(true)}
+            style={{
+              width: 40, height: 40, borderRadius: "4px",
+              backgroundColor: showFilters ? "#014aad" : "#fff",
+            }}
+            title="Advanced Filters"
+          >
+            <i className={`bi bi-funnel ${showFilters ? "text-white" : "text-dark"}`} />
+            {activeFilters > 0 && (
+              <span
+                className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+                style={{ fontSize: "0.6rem", padding: "2px 5px" }}
+              >
+                {activeFilters}
+              </span>
+            )}
+          </button>
+
+          {/* Export Button */}
+          <button
+            className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+            style={{ height: 40, fontSize: "0.85rem", borderRadius: "4px", fontWeight: 500 }}
+          >
+            <i className="bi bi-download me-2" /> Export
+          </button>
+
+          {/* Create Button */}
+          {canCreateTicket && (
+            <button
+              className="btn d-flex align-items-center gap-2 px-4"
+              style={{
+                backgroundColor: "#014aad", color: "#fff", fontWeight: 500,
+                borderRadius: "4px", height: 40, fontSize: "0.85rem", border: "none",
+              }}
+              onClick={() => handleOpenModal("create")}
             >
-              <i className="bi bi-plus-lg me-1"></i> Raise Ticket
+              <i className="bi bi-plus-lg" /> Ticket
             </button>
           )}
         </div>
       </div>
 
-      {/* Metrics */}
-      <div className="row g-3 mb-4">
-        <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Total</div>
-              <div className="bg-light text-secondary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-ticket-detailed"></i></div>
-            </div>
-            <h3 className="fw-bold mb-0 text-dark">{metrics.total}</h3>
-            <div className="text-muted mt-auto pt-2" style={{ fontSize: '0.7rem' }}>All Complaints</div>
-          </div>
-        </div>
-        <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#EF4444' }}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Open</div>
-              <div className="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-exclamation-circle"></i></div>
-            </div>
-            <h3 className="fw-bold mb-0 text-dark">{metrics.open}</h3>
-            <div className="text-muted mt-auto pt-2" style={{ fontSize: '0.7rem' }}>Awaiting Action</div>
-          </div>
-        </div>
-        <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#F59E0B' }}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>In Progress</div>
-              <div className="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-tools"></i></div>
-            </div>
-            <h3 className="fw-bold mb-0 text-dark">{metrics.inProgress}</h3>
-            <div className="text-muted mt-auto pt-2" style={{ fontSize: '0.7rem' }}>Under Repair</div>
-          </div>
-        </div>
-        <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#3B82F6' }}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Resolved</div>
-              <div className="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-check2-circle"></i></div>
-            </div>
-            <h3 className="fw-bold mb-0 text-dark">{metrics.resolved}</h3>
-            <div className="text-muted mt-auto pt-2" style={{ fontSize: '0.7rem' }}>Fixed, Awaiting Verify</div>
-          </div>
-        </div>
-        <div className="col-md-2" style={{ width: '20%' }}>
-          <div className="bg-white p-3 rounded-xl border shadow-sm d-flex flex-column transition-all hover-lift h-100 border-start border-4" style={{ borderLeftColor: '#014aad' }}>
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="text-muted small fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>Closed</div>
-              <div className="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}><i className="bi bi-check-all"></i></div>
-            </div>
-            <h3 className="fw-bold mb-0 text-dark">{metrics.closed}</h3>
-            <div className="text-muted mt-auto pt-2" style={{ fontSize: '0.7rem' }}>Verified & Closed</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-3 rounded-xl border shadow-sm mb-4 d-flex align-items-center gap-3">
-        <div className="d-flex align-items-center bg-light rounded-pill px-3 py-2 flex-grow-1" style={{ maxWidth: '40%' }}>
-          <i className="bi bi-search text-muted me-2"></i>
-          <input 
-            type="text" 
-            className="border-0 bg-transparent w-100 shadow-none small" 
-            placeholder="Search by ticket no, nature..." 
-            value={searchTerm}
-            onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
-            style={{ outline: 'none', fontSize: '0.85rem' }}
-          />
-        </div>
-        <div className="d-flex align-items-center gap-2 ms-auto flex-grow-1 justify-content-end">
-          <select 
-            className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-semibold" 
-            style={{ fontSize: '0.75rem', height: '38px', maxWidth: '180px' }}
-            value={statusFilter}
-            onChange={(e) => {setStatusFilter(e.target.value); setCurrentPage(1);}}
+      {/* Active filters chips bar */}
+      {activeFilters > 0 && (
+        <div className="d-flex align-items-center gap-2 px-4 pb-2 flex-shrink-0 flex-wrap">
+          {searchTerm && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Search: <strong>{searchTerm}</strong>
+              <button onClick={() => { setSearchTerm(""); setCurrentPage(1); }} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          {statusFilter !== "All" && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Status: <strong>{statusFilter}</strong>
+              <button onClick={() => { setStatusFilter("All"); setCurrentPage(1); }} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          {priorityFilter !== "All" && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Priority: <strong>{priorityFilter}</strong>
+              <button onClick={() => { setPriorityFilter("All"); setCurrentPage(1); }} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          {categoryFilter !== "All" && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Category: <strong>{categoryFilter}</strong>
+              <button onClick={() => { setCategoryFilter("All"); setCurrentPage(1); }} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          {propertyFilter !== "All" && (
+            <span className="badge bg-light text-dark border px-2 py-1" style={{ fontSize: "0.75rem" }}>
+              Property Selected
+              <button onClick={() => { setPropertyFilter("All"); setCurrentPage(1); }} style={{ border: "none", background: "none", cursor: "pointer", marginLeft: 4, color: "#64748b" }}>×</button>
+            </span>
+          )}
+          <button
+            onClick={handleReset}
+            className="btn btn-link btn-sm p-0 text-decoration-none fw-bold"
+            style={{ fontSize: "0.75rem", color: "#ef4444" }}
           >
-            <option value="All">Status: All</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-            <option value="Closed">Closed</option>
-          </select>
-          <select 
-            className="form-select form-select-sm border rounded-pill px-3 shadow-none bg-light text-muted fw-semibold" 
-            style={{ fontSize: '0.75rem', height: '38px', maxWidth: '200px' }}
-            value={technicianFilter}
-            onChange={(e) => {setTechnicianFilter(e.target.value); setCurrentPage(1);}}
-          >
-            <option value="All">Allocated To: All</option>
-            {technicians.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <button 
-            className="btn btn-light btn-sm border rounded-pill px-3 shadow-none fw-bold text-muted d-flex align-items-center justify-content-center gap-2" 
-            style={{ fontSize: '0.75rem', height: '38px' }}
-            onClick={() => {setSearchTerm(""); setStatusFilter("All"); setTechnicianFilter("All"); setCurrentPage(1);}}
-          >
-            <i className="bi bi-arrow-clockwise"></i> Reset
+            Clear All
           </button>
         </div>
-      </div>
+      )}
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="table-responsive">
-          <table className="table table-hover mb-0 align-middle">
-            <thead className="bg-light">
-              <tr>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em', width: '50px' }}>S.No</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Ticket No</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Nature of Complaint</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Date & Time</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Allocated To</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-center" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Escalated</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Resolved Date & Time</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-center" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Productive Hrs</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Status</th>
-                <th className="py-3 px-3 text-uppercase text-muted fw-bold border-bottom text-end" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentItems.length > 0 ? currentItems.map((c, index) => (
-                <tr 
-                  key={c._id} 
-                  className="transition-all hover-bg-light cursor-pointer" 
-                  style={{ fontSize: '0.85rem' }}
-                  onClick={() => handleOpenModal('view', c)}
-                >
-                  <td className="px-3 py-3 fw-bold text-muted">{indexOfFirstItem + index + 1}</td>
-                  <td className="px-3 py-3 fw-bold text-primary">{c.ticketNumber}</td>
-                  <td className="px-3 py-3 fw-medium text-dark">{c.natureOfComplaint}</td>
-                  <td className="px-3 py-3 text-muted">{c.dateOfComplaint ? new Date(c.dateOfComplaint).toLocaleDateString() : '-'} {c.timeOfComplaint}</td>
-                  <td className="px-3 py-3">
-                    <div className="d-flex align-items-center gap-2">
-                      <div className="bg-light rounded-circle d-flex align-items-center justify-content-center text-secondary" style={{ width: '24px', height: '24px', fontSize: '0.7rem' }}>
-                        <i className="bi bi-person"></i>
-                      </div>
-                      <span className="fw-medium">{c.allocatedTo || '-'}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    {c.escalated ? (
-                      <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2">Yes</span>
-                    ) : (
-                      <span className="text-muted">-</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-muted">{c.resolvedDate ? new Date(c.resolvedDate).toLocaleDateString() : '-'} {c.resolvedTime}</td>
-                  <td className="px-3 py-3 text-center fw-bold text-muted">{c.productiveHours || '-'}</td>
-                  <td className="px-3 py-3">
-                    <span className={`badge rounded-pill px-2 py-1 fw-medium border ${
-                      c.status === 'Open' ? 'bg-danger bg-opacity-10 text-danger border-danger' :
-                      c.status === 'In Progress' ? 'bg-warning bg-opacity-10 text-warning border-warning' :
-                      'bg-success bg-opacity-10 text-success border-success'
-                    }`}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="d-flex gap-2 justify-content-end">
-                      <button 
-                        className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-primary" 
-                        style={{ width: '28px', height: '28px' }} 
-                        title="View"
-                        onClick={() => handleOpenModal('view', c)}
-                      >
-                        <i className="bi bi-eye"></i>
-                      </button>
-                      {userRole !== 'viewer' && (
-                        <button 
-                          className="btn btn-sm btn-light rounded-circle p-1 d-flex align-items-center justify-content-center text-success" 
-                          style={{ width: '28px', height: '28px' }} 
-                          title="Edit"
-                          onClick={() => handleOpenModal('edit', c)}
-                        >
-                          <i className="bi bi-pencil"></i>
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={10} className="text-center py-5 text-muted">
-                    {isLoading ? "Loading tickets..." : "No tickets found matching your criteria."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
-          <span className="text-muted small fw-medium" style={{ fontSize: '0.75rem' }}>
-            Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredComplaints.length)} of {filteredComplaints.length} entries
-          </span>
-          <div className="d-flex gap-1">
-            <button 
-              className="btn btn-sm btn-white border px-2 shadow-none" 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            >
-              <i className="bi bi-chevron-left"></i>
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button 
-                key={page}
-                className={`btn btn-sm border-0 px-3 shadow-none ${currentPage === page ? 'btn-primary text-white' : 'btn-white border'}`}
-                style={currentPage === page ? { backgroundColor: '#014aad' } : {}}
-                onClick={() => setCurrentPage(page)}
-              >
-                {page}
-              </button>
-            ))}
-            <button 
-              className="btn btn-sm btn-white border px-2 shadow-none" 
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            >
-              <i className="bi bi-chevron-right"></i>
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Main Table */}
+      <Table
+        columns={columns}
+        data={tickets}
+        isLoading={isLoading}
+        loadingMessage="Loading support tickets ledger..."
+        emptyMessage="No tickets found matching your filter criteria."
+        containerClassName="table-responsive-container table-responsive flex-grow-1"
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={10}
+        onPageChange={(page) => setCurrentPage(page)}
+      />
+
+      {/* decupled Form Modal */}
+      <HelpdeskFormModal 
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSave={handleSaveTicket}
+      />
+
+      {/* decoupled Detail View Workspace */}
+      {isDetailOpen && selectedTicket && (
+        <HelpdeskDetailView
+          viewItem={selectedTicket}
+          onClose={() => { setIsDetailOpen(false); setSelectedTicket(null); }}
+          currentUser={currentUser}
+          onRefresh={() => { fetchTickets(); fetchStats(); }}
+        />
+      )}
+
+      {/* decoupled Filter Drawer */}
+      <HelpdeskFilterDrawer
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        priorityFilter={priorityFilter}
+        setPriorityFilter={setPriorityFilter}
+        categoryFilter={categoryFilter}
+        setCategoryFilter={setCategoryFilter}
+        propertyFilter={propertyFilter}
+        setPropertyFilter={setPropertyFilter}
+        onReset={handleReset}
+      />
 
       <style jsx global>{`
-        .hover-lift:hover { transform: translateY(-3px); }
         .text-primary { color: #014aad !important; }
-        .bg-emerald { background-color: #014aad !important; }
         .rounded-xl { border-radius: 1rem !important; }
-        .hover-bg-light:hover { background-color: rgba(0,0,0,0.02) !important; }
+        .extra-small { font-size: 0.75rem !important; }
+        .hover-bg-light:hover { background-color: #f8f9fa; }
+        .cursor-pointer { cursor: pointer; }
       `}</style>
-      
-      <HelpdeskModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveTicket}
-        editData={selectedTicket}
-        mode={modalMode}
-      />
     </div>
   );
 }

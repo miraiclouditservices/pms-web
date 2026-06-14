@@ -2,694 +2,710 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { api } from "@/utils/api";
-import BookingModal from "@/components/dashboard/BookingModal";
-import MeetingRoomModal from "@/components/dashboard/MeetingRoomModal";
-import { ModalMode } from "@/components/dashboard/AssetModal";
+import Table, { TableColumn } from "@/components/common/Table";
+import BookingFormModal from "@/components/bookings/BookingFormModal";
+import BookingDetailView from "@/components/bookings/BookingDetailView";
+import BookingFilterDrawer from "@/components/bookings/BookingFilterDrawer";
+import MeetingRoomFormModal from "@/components/bookings/MeetingRoomFormModal";
+import MeetingRoomDetailView from "@/components/bookings/MeetingRoomDetailView";
+import MeetingRoomFilterDrawer from "@/components/bookings/MeetingRoomFilterDrawer";
 
 function BookingsContent() {
-  // Navigation tabs
   const [activeTab, setActiveTab] = useState<"bookings" | "rooms">("bookings");
-  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRoomLoading, setIsRoomLoading] = useState(true);
 
-  // Data states
+  // Core Data States
   const [bookings, setBookings] = useState<any[]>([]);
   const [meetingRooms, setMeetingRooms] = useState<any[]>([]);
+
+  // Master Dropdown Data States
   const [properties, setProperties] = useState<any[]>([]);
   const [floors, setFloors] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
+  const [allMeetingRooms, setAllMeetingRooms] = useState<any[]>([]);
 
-  // Search & Filters
+  // Bookings Filters & Search
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProperty, setSelectedProperty] = useState("");
+  const [selectedFloor, setSelectedFloor] = useState("");
+  const [selectedRoomFilter, setSelectedRoomFilter] = useState("");
+
+  // Bookings Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
+
+  // Meeting Rooms Filters & Search
   const [roomSearchTerm, setRoomSearchTerm] = useState("");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [roomSelectedProperty, setRoomSelectedProperty] = useState("");
+  const [roomSelectedFloor, setRoomSelectedFloor] = useState("");
 
-  // Modals
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [bookingModalMode, setBookingModalMode] = useState<ModalMode>("create");
+  // Meeting Rooms Pagination
+  const [roomCurrentPage, setRoomCurrentPage] = useState(1);
+  const [roomTotalItems, setRoomTotalItems] = useState(0);
+  const [roomTotalPages, setRoomTotalPages] = useState(1);
+  const roomLimit = 10;
+
+  // Overlays / Modals visibility
+  const [isBookingFormModalOpen, setIsBookingFormModalOpen] = useState(false);
+  const [bookingFormModalMode, setBookingFormModalMode] = useState<"create" | "edit">("create");
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [isBookingDetailViewOpen, setIsBookingDetailViewOpen] = useState(false);
+  const [isBookingFilterDrawerOpen, setIsBookingFilterDrawerOpen] = useState(false);
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
-  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
-  const [roomModalMode, setRoomModalMode] = useState<ModalMode>("create");
+  const [isRoomFormModalOpen, setIsRoomFormModalOpen] = useState(false);
+  const [roomFormModalMode, setRoomFormModalMode] = useState<"create" | "edit">("create");
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
+  const [isRoomDetailViewOpen, setIsRoomDetailViewOpen] = useState(false);
+  const [isRoomFilterDrawerOpen, setIsRoomFilterDrawerOpen] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Format "HH:MM" to 12-Hour format helper
+  const format12Hour = (time24: string) => {
+    if (!time24) return "";
+    const [hStr, mStr] = time24.split(':');
+    let h = parseInt(hStr, 10);
+    if (isNaN(h)) return time24;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+  };
+
   useEffect(() => {
-    fetchInitialData();
+    fetchMasterData();
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("user");
       if (stored) {
         try {
           setCurrentUser(JSON.parse(stored));
-        } catch {}
+        } catch { }
       }
     }
   }, []);
 
-  const fetchInitialData = async () => {
+  // Fetch paginated bookings when search/filter/page parameters update
+  const fetchBookings = async (page = currentPage) => {
     setIsLoading(true);
     try {
-      const [bookRes, roomRes, propRes, floorRes, unitRes] = await Promise.all([
-        api.get('/bookings'),
-        api.get('/meeting-rooms'),
-        api.get('/properties'),
-        api.get('/floors'),
-        api.get('/units')
-      ]);
+      const params = new URLSearchParams();
+      params.append("limit", String(limit));
+      params.append("page", String(page));
+      if (searchTerm) params.append("search", searchTerm);
+      if (selectedProperty) params.append("property", selectedProperty);
+      if (selectedFloor) params.append("floor", selectedFloor);
+      if (selectedRoomFilter) params.append("meetingRoom", selectedRoomFilter);
 
-      if (bookRes.success) setBookings(bookRes.data);
-      if (roomRes.success) setMeetingRooms(roomRes.data);
-      if (propRes.success) setProperties(propRes.data);
-      if (floorRes.success) setFloors(floorRes.data);
-      if (unitRes.success) setUnits(unitRes.data);
+      const res = await api.get(`/bookings?${params.toString()}`);
+      if (res.success) {
+        setBookings(res.data || []);
+        setTotalItems(res.total || 0);
+        setTotalPages(res.pages || 1);
+      }
     } catch (err) {
-      console.error("Failed to load initial booking/room/unit data:", err);
+      console.error("Failed to load bookings:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const reloadBookings = async () => {
+  // Fetch paginated meeting rooms when search/filter/page parameters update
+  const fetchRooms = async (page = roomCurrentPage) => {
+    setIsRoomLoading(true);
     try {
-      const res = await api.get('/bookings');
-      if (res.success) setBookings(res.data);
+      const params = new URLSearchParams();
+      params.append("page", String(page));
+      params.append("limit", String(roomLimit));
+      if (roomSearchTerm) params.append("search", roomSearchTerm);
+      if (roomSelectedProperty) params.append("property", roomSelectedProperty);
+      if (roomSelectedFloor) params.append("floor", roomSelectedFloor);
+
+      const res = await api.get(`/meeting-rooms?${params.toString()}`);
+      if (res.success) {
+        setMeetingRooms(res.data || []);
+        setRoomTotalItems(res.total || 0);
+        setRoomTotalPages(res.pages || 1);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load meeting rooms:", err);
+    } finally {
+      setIsRoomLoading(false);
     }
   };
 
-  const reloadRooms = async () => {
+  // Fetch all necessary master metadata lists for dropdown selectors
+  const fetchMasterData = async () => {
     try {
-      const res = await api.get('/meeting-rooms');
-      if (res.success) setMeetingRooms(res.data);
-      
-      // Update floors to capture changed stats
-      const floorRes = await api.get('/floors');
-      if (floorRes.success) setFloors(floorRes.data);
+      const [propRes, floorRes, unitRes, roomRes] = await Promise.all([
+        api.get('/properties'),
+        api.get('/floors'),
+        api.get('/units'),
+        api.get('/meeting-rooms?limit=1000')
+      ]);
 
-      const unitRes = await api.get('/units');
-      if (unitRes.success) setUnits(unitRes.data);
+      if (propRes.success) setProperties(propRes.data || []);
+      if (floorRes.success) setFloors(floorRes.data || []);
+      if (unitRes.success) setUnits(unitRes.data || []);
+      if (roomRes.success) setAllMeetingRooms(roomRes.data || []);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load initial master dropdowns:", err);
     }
   };
 
-  // Booking CRUD handlers
-  const handleOpenBookingModal = (mode: ModalMode, booking: any = null) => {
-    setBookingModalMode(mode);
-    setSelectedBooking(booking);
-    setIsBookingModalOpen(true);
-  };
+  useEffect(() => {
+    fetchBookings(currentPage);
+  }, [currentPage, searchTerm, selectedProperty, selectedFloor, selectedRoomFilter]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedProperty, selectedFloor, selectedRoomFilter]);
+
+  useEffect(() => {
+    fetchRooms(roomCurrentPage);
+  }, [roomCurrentPage, roomSearchTerm, roomSelectedProperty, roomSelectedFloor]);
+
+  useEffect(() => {
+    setRoomCurrentPage(1);
+  }, [roomSearchTerm, roomSelectedProperty, roomSelectedFloor]);
+
+  // Booking CRUD helpers
   const handleSaveBooking = async (savedData: any) => {
     let response;
-    if (bookingModalMode === 'edit') {
+    if (bookingFormModalMode === 'edit') {
       response = await api.put(`/bookings/${savedData._id}`, savedData);
     } else {
       response = await api.post('/bookings', savedData);
     }
-    
+
     if (!response.success) {
-      throw new Error(response.error || "Overlapping slot or validation error.");
+      throw new Error(response.error || "Overlap slot conflict or validation failure.");
     }
-    await reloadBookings();
+    await fetchBookings(currentPage);
   };
 
   const handleDeleteBooking = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this booking?")) return;
     try {
       const response = await api.delete(`/bookings/${id}`);
-      if (response.success) await reloadBookings();
-    } catch (err) {
-      console.error("Failed to delete booking:", err);
-    }
-  };
-
-  const handleBookingStatusChange = async (id: string, status: string) => {
-    try {
-      const response = await api.put(`/bookings/${id}`, { bookingStatus: status });
       if (response.success) {
-        await reloadBookings();
-      } else {
-        alert(response.error || "Conflict: Cannot approve booking due to overlapping slot.");
+        await fetchBookings(currentPage);
       }
     } catch (err) {
-      console.error("Failed to update status:", err);
+      console.error("Failed to cancel booking:", err);
     }
   };
 
-  // Room CRUD handlers
-  const handleOpenRoomModal = (mode: ModalMode, room: any = null) => {
-    setRoomModalMode(mode);
-    setSelectedRoom(room);
-    setIsRoomModalOpen(true);
-  };
-
+  // Room CRUD helpers
   const handleSaveRoom = async (savedData: any) => {
     let response;
-    if (roomModalMode === 'edit') {
+    if (roomFormModalMode === 'edit') {
       response = await api.put(`/meeting-rooms/${savedData._id}`, savedData);
     } else {
       response = await api.post('/meeting-rooms', savedData);
     }
-    
+
     if (!response.success) {
-      throw new Error(response.error || "Failed to save meeting room.");
+      throw new Error(response.error || "Failed to save room details.");
     }
-    await reloadRooms();
+    await fetchRooms(roomCurrentPage);
+    await fetchMasterData(); // Refresh dropdown list
   };
 
-  const handleDeleteRoom = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this meeting room space? Its occupied SFT will return to the floor's available pool.")) return;
-    try {
-      const response = await api.delete(`/meeting-rooms/${id}`);
-      if (response.success) await reloadRooms();
-    } catch (err) {
-      console.error("Failed to delete room:", err);
+
+
+  const isAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin' || currentUser?.role === 'FLOOR_ADMIN' || currentUser?.role === 'Floor Admin';
+  const isRoomAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'Super Admin' || currentUser?.role === 'FLOOR_ADMIN' || currentUser?.role === 'Floor Admin';
+
+
+  // Bookings Table Columns
+  const bookingColumns: TableColumn<any>[] = [
+
+    {
+      header: "Booking ID",
+      render: (b) => <span className="fw-bold" style={{ color: "#014aad" }}>{b.bookingId}</span>
+    },
+
+    {
+      header: "Properties & Floors",
+      render: (b) => (
+        <span className="text-muted" style={{ fontSize: "0.8rem" }}>
+          <i className="bi bi-building me-1" />{b.property?.propertyName || "—"} <br />
+          <i className="bi bi-layers me-1" />{b.floor?.floorName || `Floor ${b.floor?.floorNumber || "—"}`}
+        </span>
+      )
+    },
+    {
+      header: "Date & Time Slot",
+      render: (b) => (
+        <div>
+          <strong className="text-dark"><i className="bi bi-calendar-event me-1" />{b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-GB') : '—'}</strong>
+          <div className="text-secondary small mt-1">
+            <i className="bi bi-clock me-1" />{format12Hour(b.startTime)} - {format12Hour(b.endTime)}
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Booked By",
+      render: (b) => <span className="fw-semibold text-dark">{b.bookedBy}</span>
+    },
+
+    {
+      header: "Status",
+      render: () => (
+        <span className="badge rounded-pill fw-bold border px-3 py-1 bg-success bg-opacity-10 text-success border-success" style={{ fontSize: '0.7rem' }}>
+          Approved
+        </span>
+      )
+    },
+    {
+      header: "Actions",
+      style: { textAlign: "center" },
+      render: (b) => (
+        <div className="d-flex gap-2 justify-content-center align-items-center">
+          <button
+            title="View Details"
+            onClick={() => {
+              setSelectedBooking(b);
+              setIsBookingDetailViewOpen(true);
+            }}
+            style={{
+              width: 32, height: 32, borderRadius: "6px", border: "1px solid #e2e8f0",
+              background: "#fff", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#1e293b",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+          >
+            <i className="bi bi-eye text-secondary" style={{ fontSize: '0.9rem' }} />
+          </button>
+
+          {(isAdmin || currentUser?.name === b.bookedBy) && (
+            <button
+              title="Cancel Booking"
+              onClick={() => setCancelConfirmId(b._id)}
+              style={{
+                width: 32, height: 32, borderRadius: "6px", border: "1px solid #e2e8f0",
+                background: "#fff", cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center", color: "#1e293b",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+            >
+              <i className="bi bi-x-circle text-danger" style={{ fontSize: '0.9rem' }} />
+            </button>
+          )}
+        </div>
+      )
     }
-  };
+  ];
 
-  // Filters
-  const filteredBookings = bookings.filter(b => {
-    const isOwner = currentUser?.role === "Owner" || currentUser?.role === "OFFICE_OWNER";
-    if (isOwner) {
-      const matchName = (b.bookedBy || "").toLowerCase().includes(currentUser.name?.toLowerCase() || "");
-      const matchParticulars = (b.bookingParticulars || "").toLowerCase().includes((currentUser.companyName || "").toLowerCase());
-      if (!matchName && !matchParticulars) return false;
+  // Meeting Rooms Table Columns
+  const roomColumns: TableColumn<any>[] = [
+
+    {
+      header: "Room / Space Name",
+      render: (r) => (
+        <div>
+          <span className="fw-bold text-dark">{r.roomName}</span>
+          {r.unit && (
+            <span className="badge bg-light text-primary border ms-2" style={{ fontSize: '0.65rem', fontWeight: 600 }}>
+              <i className="bi bi-door-closed me-1" />
+              Unit {r.unit.unitNumber || r.unit}
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      header: "Property Association",
+      render: (r) => <span className="text-muted">{r.property?.propertyName || '—'}</span>
+    },
+    {
+      header: "Floor Level",
+      render: (r) => <span className="text-muted">{r.floor?.floorName || `Floor ${r.floor?.floorNumber || '—'}`}</span>
+    },
+    {
+      header: "Space (SFT)",
+      render: (r) => <span className="fw-bold text-dark">{r.sqft} SFT</span>
+    },
+    {
+      header: "Capacity",
+      render: (r) => <span className="fw-medium text-dark">{r.capacity} Pax</span>
+    },
+    {
+      header: "Status",
+      render: (r) => (
+        <span className={`badge rounded-pill border px-3 py-1 ${r.status === 'Under Maintenance' ? 'bg-danger bg-opacity-10 text-danger border-danger' : 'bg-success bg-opacity-10 text-success border-success'
+          }`} style={{ fontSize: '0.7rem' }}>
+          {r.status || 'Available'}
+        </span>
+      )
+    },
+    {
+      header: "Actions",
+      style: { textAlign: "center" },
+      render: (r) => (
+        <div className="d-flex gap-2 justify-content-center align-items-center">
+          <button
+            className="btn btn-sm text-white border-0 hover-lift"
+            onClick={() => {
+              setSelectedBooking({ meetingRoom: r, property: r.property, floor: r.floor });
+              setBookingFormModalMode("create");
+              setIsBookingFormModalOpen(true);
+            }}
+            style={{ fontSize: '0.7rem', backgroundColor: "#014aad", borderRadius: "4px", padding: "6px 12px" }}
+            disabled={r.status === 'Under Maintenance'}
+          >
+            📅 Book Room
+          </button>
+          <button
+            title="View Specifications"
+            onClick={() => {
+              setSelectedRoom(r);
+              setIsRoomDetailViewOpen(true);
+            }}
+            style={{
+              width: 32, height: 32, borderRadius: "6px", border: "1px solid #e2e8f0",
+              background: "#fff", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#1e293b",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+          >
+            <i className="bi bi-eye text-secondary" style={{ fontSize: '0.9rem' }} />
+          </button>
+        </div>
+      )
     }
-
-    const roomName = b.meetingRoom?.roomName || "";
-    return (
-      (b.bookingId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.bookedBy || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.bookingParticulars || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      roomName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
-
-  const filteredRooms = meetingRooms.filter(r => {
-    const roomName = r.roomName || "";
-    const propName = r.property?.propertyName || "";
-    const floorName = r.floor?.floorName || `Floor ${r.floor?.floorNumber || ""}`;
-    return (
-      roomName.toLowerCase().includes(roomSearchTerm.toLowerCase()) ||
-      propName.toLowerCase().includes(roomSearchTerm.toLowerCase()) ||
-      floorName.toLowerCase().includes(roomSearchTerm.toLowerCase())
-    );
-  });
-
-  // Calendar Helpers
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-
-  const daysInMonth = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
-  const firstDay = getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth());
-  
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-  const isAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'Admin' || currentUser?.role === 'FLOOR_ADMIN';
+  ];
 
   return (
-    <div className="container-fluid p-0" style={{ fontFamily: 'var(--font-geist-sans)' }}>
-      {/* Global CSS for Custom scrollbar & Styling */}
-      <style jsx global>{`
-        .table-responsive::-webkit-scrollbar {
-          height: 6px;
-          width: 6px;
-        }
-        .table-responsive::-webkit-scrollbar-track {
-          background: #f8fafc;
-        }
-        .table-responsive::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 4px;
-        }
-        .table-responsive::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
-        .rounded-xl { border-radius: 12px !important; }
-        .text-primary-brand { color: #014aad !important; }
-        .bg-primary-brand { background-color: #014aad !important; }
-        .hover-lift:hover { transform: translateY(-2px); }
-        .hover-bg-light:hover { background-color: #f8fafc !important; }
-      `}</style>
-
+    <div
+      className="p-0 d-flex flex-column bg-white border rounded-4"
+      style={{ height: "calc(100vh - 104px)", fontFamily: "var(--font-geist-sans)", overflow: "hidden" }}
+    >
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div
+        className="d-flex justify-content-between align-items-center pb-2 pt-3 px-4 flex-shrink-0 border-bottom"
+        style={{ backgroundColor: "#ffffff" }}
+      >
         <div>
-          <h2 className="fw-bold mb-0 text-dark" style={{ letterSpacing: '-0.02em', fontSize: '1.4rem' }}>
-            Meeting Room & Space Booking
-          </h2>
-          <p className="text-muted small mb-0">Manage shared floor resources, corporate boardrooms, and reservation timetables.</p>
+          <span className="fw-bold text-dark" style={{ fontSize: "1rem" }}>Meeting Room & Space Booking</span>
+          {activeTab === 'bookings' ? (
+            <div className="d-flex gap-3 mt-1 text-muted" style={{ fontSize: "0.72rem" }}>
+              <span>Total Bookings: <strong className="text-dark">{totalItems}</strong></span>
+            </div>
+          ) : (
+            <div className="d-flex gap-3 mt-1 text-muted" style={{ fontSize: "0.72rem" }}>
+              <span>Total Designated Resources: <strong className="text-dark">{roomTotalItems}</strong></span>
+            </div>
+          )}
         </div>
-        <div className="d-flex gap-2">
-          {/* Tabs */}
-          <div className="btn-group bg-light p-1 rounded-pill me-2">
-            <button 
-              className={`btn btn-sm rounded-pill px-3 fw-bold ${activeTab === 'bookings' ? 'btn-white shadow-sm' : 'btn-transparent text-muted'}`}
-              onClick={() => setActiveTab('bookings')}
-              style={{ fontSize: '0.75rem' }}
-            >
-              📅 Schedule Timetable
-            </button>
-            <button 
-              className={`btn btn-sm rounded-pill px-3 fw-bold ${activeTab === 'rooms' ? 'btn-white shadow-sm' : 'btn-transparent text-muted'}`}
-              onClick={() => setActiveTab('rooms')}
-              style={{ fontSize: '0.75rem' }}
-            >
-              🏢 Meeting Rooms Master
-            </button>
+
+        <div className="d-flex gap-2 align-items-center">
+          {/* Main Module Tabs */}
+          {isRoomAdmin && (
+            <div className="btn-group bg-light p-1 me-2" style={{ borderRadius: "4px" }}>
+              <button
+                className={`btn btn-sm px-3 fw-bold ${activeTab === 'bookings' ? 'btn-white shadow-sm' : 'btn-transparent text-muted'}`}
+                onClick={() => setActiveTab('bookings')}
+                style={{ fontSize: '0.75rem', borderRadius: "4px" }}
+              >
+                📅 Schedule Timetable
+              </button>
+              <button
+                className={`btn btn-sm px-3 fw-bold ${activeTab === 'rooms' ? 'btn-white shadow-sm' : 'btn-transparent text-muted'}`}
+                onClick={() => setActiveTab('rooms')}
+                style={{ fontSize: '0.75rem', borderRadius: "4px" }}
+              >
+                🏢 Rooms Master
+              </button>
+            </div>
+          )}
+
+          {/* Search bar */}
+          <div className="position-relative" style={{ width: 260 }}>
+            <input
+              type="text"
+              className="form-control px-3 py-2"
+              placeholder={activeTab === 'bookings' ? "Search bookings..." : "Search rooms..."}
+              value={activeTab === 'bookings' ? searchTerm : roomSearchTerm}
+              onChange={e => {
+                if (activeTab === 'bookings') {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                } else {
+                  setRoomSearchTerm(e.target.value);
+                  setRoomCurrentPage(1);
+                }
+              }}
+              style={{ borderRadius: "4px", border: "1px solid #e0e0e0", fontSize: "0.85rem", height: 40 }}
+            />
+            {(activeTab === 'bookings' ? searchTerm : roomSearchTerm) ? (
+              <button
+                onClick={() => {
+                  if (activeTab === 'bookings') {
+                    setSearchTerm("");
+                    setCurrentPage(1);
+                  } else {
+                    setRoomSearchTerm("");
+                    setRoomCurrentPage(1);
+                  }
+                }}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  border: "none", background: "none", cursor: "pointer", color: "#94a3b8",
+                  fontSize: "0.85rem", lineHeight: 1,
+                }}
+              >×</button>
+            ) : (
+              <i className="bi bi-search position-absolute text-muted"
+                style={{ right: 12, top: "50%", transform: "translateY(-50%)", fontSize: "0.8rem" }} />
+            )}
           </div>
 
+          {/* Filter Toggle */}
+          <button
+            className={`btn border d-flex align-items-center justify-content-center position-relative ${
+              (activeTab === 'bookings' ? isBookingFilterDrawerOpen : isRoomFilterDrawerOpen) ? "text-white border-primary" : "bg-white text-dark border-light"
+            }`}
+            onClick={() => {
+              if (activeTab === 'bookings') {
+                setIsBookingFilterDrawerOpen(true);
+              } else {
+                setIsRoomFilterDrawerOpen(true);
+              }
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "4px",
+              backgroundColor: (activeTab === 'bookings' ? isBookingFilterDrawerOpen : isRoomFilterDrawerOpen) ? "#014aad" : "#fff",
+              border: "1px solid #e2e8f0"
+            }}
+            title="Filters"
+          >
+            <i className={`bi bi-funnel ${(activeTab === 'bookings' ? isBookingFilterDrawerOpen : isRoomFilterDrawerOpen) ? "text-white" : "text-dark"}`} />
+          </button>
+
+          {/* Add Button */}
           {activeTab === 'bookings' ? (
-            <button 
-              className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold text-white border-0 bg-primary-brand" 
-              style={{ fontSize: '0.75rem' }}
-              onClick={() => handleOpenBookingModal('create')}
+            <button
+              className="btn d-flex align-items-center gap-2 px-3 text-white border-0"
+              style={{
+                backgroundColor: "#014aad", fontWeight: 500,
+                borderRadius: "4px", height: 40, fontSize: "0.85rem"
+              }}
+              onClick={() => {
+                setSelectedBooking(null);
+                setBookingFormModalMode("create");
+                setIsBookingFormModalOpen(true);
+              }}
             >
-              <i className="bi bi-plus-lg me-1"></i> Book a Room
+              <i className="bi bi-plus-lg" /> Book Room
             </button>
           ) : (
-            isAdmin && (
-              <button 
-                className="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold text-white border-0 bg-primary-brand" 
-                style={{ fontSize: '0.75rem' }}
-                onClick={() => handleOpenRoomModal('create')}
+            isRoomAdmin && (
+              <button
+                className="btn d-flex align-items-center gap-2 px-3 text-white border-0"
+                style={{
+                  backgroundColor: "#014aad", fontWeight: 500,
+                  borderRadius: "4px", height: 40, fontSize: "0.85rem"
+                }}
+                onClick={() => {
+                  setSelectedRoom(null);
+                  setRoomFormModalMode("create");
+                  setIsRoomFormModalOpen(true);
+                }}
               >
-                <i className="bi bi-plus-lg me-1"></i> Convert Floor Space (Add Room)
+                <i className="bi bi-plus-lg" /> Add Room
               </button>
             )
           )}
         </div>
       </div>
 
-      {/* Booking View Tab */}
+      {/* Bookings Timetable view */}
       {activeTab === 'bookings' && (
-        <>
-          {/* Controls Bar */}
-          <div className="bg-white p-3 rounded-3 border shadow-sm mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div className="d-flex align-items-center bg-light rounded-pill px-3 py-1 flex-grow-1" style={{ maxWidth: '350px' }}>
-              <i className="bi bi-search text-muted me-2" style={{ fontSize: '0.85rem' }}></i>
-              <input 
-                type="text" 
-                className="border-0 bg-transparent w-100 shadow-none" 
-                placeholder="Search bookings by room, booker, purpose..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ outline: 'none', fontSize: '0.8rem', height: '30px' }}
-              />
-            </div>
-            
-            <div className="d-flex align-items-center gap-3">
-              {viewMode === 'calendar' && (
-                <div className="d-flex align-items-center gap-2">
-                   <button className="btn btn-sm btn-light rounded-circle" onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}>
-                     <i className="bi bi-chevron-left"></i>
-                   </button>
-                   <span className="fw-bold text-dark small" style={{ minWidth: '110px', textAlign: 'center' }}>
-                     {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-                   </span>
-                   <button className="btn btn-sm btn-light rounded-circle" onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}>
-                     <i className="bi bi-chevron-right"></i>
-                   </button>
-                </div>
-              )}
-
-              <div className="btn-group bg-light p-1 rounded-pill">
-                <button 
-                  className={`btn btn-sm rounded-pill px-3 fw-bold ${viewMode === 'table' ? 'btn-white shadow-sm' : 'btn-transparent text-muted'}`}
-                  onClick={() => setViewMode('table')}
-                  style={{ fontSize: '0.7rem' }}
-                >
-                  <i className="bi bi-list-task me-1"></i> List
-                </button>
-                <button 
-                  className={`btn btn-sm rounded-pill px-3 fw-bold ${viewMode === 'calendar' ? 'btn-white shadow-sm' : 'btn-transparent text-muted'}`}
-                  onClick={() => setViewMode('calendar')}
-                  style={{ fontSize: '0.7rem' }}
-                >
-                  <i className="bi bi-calendar3 me-1"></i> Calendar
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Schedule Listings */}
-          <div className="bg-white rounded-3 shadow-sm border overflow-hidden">
-            {viewMode === 'table' ? (
-              <div className="table-responsive w-100" style={{ display: 'block' }}>
-                <table className="table mb-0 align-middle text-nowrap" style={{ width: '100%' }}>
-                  <thead>
-                    <tr>
-                      {[
-                        'S No', 'Booking ID', 'Meeting Room / Hall', 'Properties & Floors', 'Date & Time Slot',
-                        'Booked By', 'Booking Particulars', 'Status', 'Actions'
-                      ].map((col, idx) => (
-                        <th
-                          key={col}
-                          style={{
-                            position: 'sticky', top: 0, zIndex: 9,
-                            fontSize: '0.75rem', backgroundColor: '#3f3f3f', color: '#ffffff',
-                            border: 'none', fontWeight: 600, padding: '12px 16px',
-                            borderTopLeftRadius: idx === 0 ? '8px' : '0px',
-                            borderTopRightRadius: idx === 8 ? '8px' : '0px',
-                            textAlign: idx === 8 ? 'center' : 'left'
-                          }}
-                        >
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      <tr>
-                        <td colSpan={9} className="text-center py-5 text-muted small">
-                          <div className="spinner-border spinner-border-sm me-2 text-primary-brand" role="status" />
-                          Loading scheduled bookings...
-                        </td>
-                      </tr>
-                    ) : filteredBookings.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="text-center py-5 text-muted small">
-                          <i className="bi bi-inbox me-2" />No meeting room bookings registered on this system.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredBookings.map((b, index) => {
-                        const statusCfg: Record<string, { bg: string; color: string; label: string }> = {
-                          Approved: { bg: 'bg-success bg-opacity-10 text-success border-success', color: '#15803d', label: 'Approved' },
-                          Rejected: { bg: 'bg-danger bg-opacity-10 text-danger border-danger', color: '#b91c1c', label: 'Rejected' },
-                          Pending:  { bg: 'bg-warning bg-opacity-10 text-warning border-warning', color: '#a16207', label: 'Pending'  },
-                        };
-                        const s = statusCfg[b.bookingStatus] || statusCfg['Pending'];
-                        return (
-                          <tr
-                            key={b._id}
-                            className="hover-bg-light"
-                            style={{
-                              borderBottom: '1px solid #f1f5f9',
-                              fontSize: '0.82rem',
-                            }}
-                          >
-                            <td className="py-3 px-3 text-muted fw-bold">{String(index + 1).padStart(3, '0')}</td>
-                            <td className="py-3 px-3 fw-bold text-primary-brand">{b.bookingId}</td>
-                            <td className="py-3 px-3">
-                              <span className="fw-bold text-dark">{b.meetingRoom?.roomName || 'Unknown Room'}</span>
-                              {b.meetingRoom?.sqft && (
-                                <span className="badge bg-light text-secondary border ms-2 small" style={{ fontSize: '0.65rem' }}>
-                                  {b.meetingRoom.sqft} SFT
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-muted">
-                              <i className="bi bi-building me-1"></i>{b.property?.propertyName || '—'} <br />
-                              <i className="bi bi-layers me-1"></i>{b.floor?.floorName || `Floor ${b.floor?.floorNumber || '—'}`}
-                            </td>
-                            <td className="py-3 px-3">
-                              <strong className="text-dark"><i className="bi bi-calendar-event me-1"></i>{b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-GB') : '—'}</strong>
-                              <div className="text-secondary small mt-1">
-                                <i className="bi bi-clock me-1"></i>{b.startTime} - {b.endTime}
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 fw-medium text-dark">{b.bookedBy}</td>
-                            <td className="py-3 px-3 text-truncate text-muted" style={{ maxWidth: '180px' }} title={b.bookingParticulars}>
-                              {b.bookingParticulars}
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`badge rounded-pill fw-bold border px-3 py-1 ${s.bg}`} style={{ fontSize: '0.7rem' }}>
-                                {s.label}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-center">
-                              <div className="d-flex gap-2 justify-content-center align-items-center">
-                                <button
-                                  className="btn btn-link p-0" title="View Booking Details"
-                                  onClick={() => handleOpenBookingModal('view', b)}
-                                >
-                                  <i className="bi bi-eye-fill text-secondary fs-6" />
-                                </button>
-                                
-                                {isAdmin && (
-                                  <>
-                                    <button
-                                      className="btn btn-link p-0" title="Modify Slot"
-                                      onClick={() => handleOpenBookingModal('edit', b)}
-                                    >
-                                      <i className="bi bi-pencil-square text-primary fs-6" />
-                                    </button>
-                                    
-                                    {b.bookingStatus !== 'Approved' && (
-                                      <button
-                                        className="btn btn-link p-0" title="Approve Request"
-                                        onClick={() => handleBookingStatusChange(b._id, 'Approved')}
-                                      >
-                                        <i className="bi bi-check-circle-fill text-success fs-6" />
-                                      </button>
-                                    )}
-                                    
-                                    {b.bookingStatus !== 'Rejected' && (
-                                      <button
-                                        className="btn btn-link p-0" title="Reject Request"
-                                        onClick={() => handleBookingStatusChange(b._id, 'Rejected')}
-                                      >
-                                        <i className="bi bi-x-circle-fill text-danger fs-6" />
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-
-                                {(isAdmin || currentUser?.name === b.bookedBy) && (
-                                  <button
-                                    className="btn btn-link p-0" title="Delete Booking"
-                                    onClick={() => handleDeleteBooking(b._id)}
-                                  >
-                                    <i className="bi bi-trash text-danger fs-6" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              // Calendar Grid Mode
-              <div className="p-3">
-                <div className="calendar-grid d-grid" style={{ gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px', backgroundColor: '#e2e8f0', border: '1px solid #e2e8f0' }}>
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-                    <div key={day} className="bg-light py-2 text-center fw-bold text-muted small">{day}</div>
-                  ))}
-                  {Array.from({ length: firstDay }).map((_, i) => (
-                    <div key={`empty-${i}`} className="bg-white" style={{ minHeight: '100px' }}></div>
-                  ))}
-                  {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                    const dayBookings = filteredBookings.filter(b => {
-                      if (!b.bookingDate) return false;
-                      const d = new Date(b.bookingDate);
-                      return d.getDate() === day && d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
-                    });
-
-                    return (
-                      <div key={day} className="bg-white p-2 position-relative hover-bg-light" style={{ minHeight: '110px', transition: '0.2s' }}>
-                        <span className={`fw-bold small px-2 py-1 ${dayDate.toDateString() === new Date().toDateString() ? 'bg-primary-brand text-white rounded-circle d-inline-flex align-items-center justify-content-center' : 'text-muted'}`} 
-                          style={{ width: '22px', height: '22px', fontSize: '0.75rem' }}>{day}</span>
-                        <div className="mt-2 d-flex flex-column gap-1">
-                          {dayBookings.slice(0, 3).map((b, idx) => (
-                            <div key={idx} 
-                              className="px-2 py-1 rounded text-truncate fw-medium text-white shadow-sm" 
-                              style={{ fontSize: '0.65rem', backgroundColor: b.bookingStatus === 'Approved' ? '#014aad' : b.bookingStatus === 'Rejected' ? '#dc2626' : '#d97706', cursor: 'pointer' }}
-                              onClick={() => handleOpenBookingModal('view', b)}
-                              title={`${b.meetingRoom?.roomName || 'Meeting'}: ${b.startTime}-${b.endTime}`}
-                            >
-                              {b.meetingRoom?.roomName || 'Meeting'}
-                            </div>
-                          ))}
-                          {dayBookings.length > 3 && (
-                            <div className="text-muted small ps-1" style={{ fontSize: '0.6rem' }}>+ {dayBookings.length - 3} more</div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </>
+        <div className="flex-grow-1 overflow-hidden p-0 d-flex flex-column">
+          <Table
+            columns={bookingColumns}
+            data={bookings}
+            isLoading={isLoading}
+            loadingMessage="Fetching reservations log..."
+            emptyMessage="No reservation records match this filter query."
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={limit}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
+        </div>
       )}
 
-      {/* Rooms Master Tab */}
-      {activeTab === 'rooms' && (
-        <>
-          {/* Controls Bar */}
-          <div className="bg-white p-3 rounded-3 border shadow-sm mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div className="d-flex align-items-center bg-light rounded-pill px-3 py-1 flex-grow-1" style={{ maxWidth: '350px' }}>
-              <i className="bi bi-search text-muted me-2" style={{ fontSize: '0.85rem' }}></i>
-              <input 
-                type="text" 
-                className="border-0 bg-transparent w-100 shadow-none" 
-                placeholder="Search rooms by name, property, or floor..." 
-                value={roomSearchTerm}
-                onChange={(e) => setRoomSearchTerm(e.target.value)}
-                style={{ outline: 'none', fontSize: '0.8rem', height: '30px' }}
-              />
-            </div>
-            
-            <div className="small text-muted fw-bold">
-              Total Designated Shared Resources: {filteredRooms.length} Meeting Rooms
-            </div>
-          </div>
-
-          {/* Rooms Table */}
-          <div className="bg-white rounded-3 shadow-sm border overflow-hidden">
-            <div className="table-responsive w-100" style={{ display: 'block' }}>
-              <table className="table mb-0 align-middle text-nowrap" style={{ width: '100%' }}>
-                <thead>
-                  <tr>
-                    {[
-                      'S No', 'Room / Hall Name', 'Property Association', 'Floor Level', 
-                      'Space Allocated (SFT)', 'Seating Capacity', 'Status', 'Actions'
-                    ].map((col, idx) => (
-                      <th
-                        key={col}
-                        style={{
-                          position: 'sticky', top: 0, zIndex: 9,
-                          fontSize: '0.75rem', backgroundColor: '#3f3f3f', color: '#ffffff',
-                          border: 'none', fontWeight: 600, padding: '12px 16px',
-                          borderTopLeftRadius: idx === 0 ? '8px' : '0px',
-                          borderTopRightRadius: idx === 7 ? '8px' : '0px',
-                          textAlign: idx === 7 ? 'center' : 'left'
-                        }}
-                      >
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-5 text-muted small">
-                        <div className="spinner-border spinner-border-sm me-2 text-primary-brand" role="status" />
-                        Loading designated room resources...
-                      </td>
-                    </tr>
-                  ) : filteredRooms.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-5 text-muted small">
-                        <i className="bi bi-building-exclamation me-2" />No meeting rooms designated yet. Convert floor spaces to create one.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRooms.map((r, index) => {
-                      const isMaintenance = r.status === 'Under Maintenance';
-                      return (
-                        <tr
-                          key={r._id}
-                          className="hover-bg-light"
-                          style={{
-                            borderBottom: '1px solid #f1f5f9',
-                            fontSize: '0.82rem',
-                          }}
-                        >
-                          <td className="py-3 px-3 text-muted fw-bold">{String(index + 1).padStart(3, '0')}</td>
-                          <td className="py-3 px-3 fw-bold text-dark">
-                            <div>{r.roomName}</div>
-                            {r.unit && (
-                              <span className="badge bg-light text-primary border mt-1" style={{ fontSize: '0.65rem', fontWeight: 600 }}>
-                                <i className="bi bi-door-closed me-1"></i>
-                                Unit {typeof r.unit === 'object' ? r.unit.unitNumber : r.unit}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-muted">{r.property?.propertyName || '—'}</td>
-                          <td className="py-3 px-3 text-muted">{r.floor?.floorName || `Floor ${r.floor?.floorNumber || '—'}`}</td>
-                          <td className="py-3 px-3 fw-bold text-dark">{r.sqft} SFT</td>
-                          <td className="py-3 px-3 fw-medium text-dark">{r.capacity} Pax</td>
-                          <td className="py-3 px-3">
-                            <span className={`badge rounded-pill border px-3 py-1 ${
-                              isMaintenance ? 'bg-danger bg-opacity-10 text-danger border-danger' : 'bg-success bg-opacity-10 text-success border-success'
-                            }`} style={{ fontSize: '0.7rem' }}>
-                              {r.status || 'Available'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <div className="d-flex gap-2 justify-content-center align-items-center">
-                              <button
-                                className="btn btn-sm btn-primary rounded-pill px-3 fw-bold text-white border-0 bg-primary-brand hover-lift me-1"
-                                onClick={() => handleOpenBookingModal('create', { meetingRoom: r, property: r.property, floor: r.floor })}
-                                style={{ fontSize: '0.7rem' }}
-                                disabled={r.status === 'Under Maintenance'}
-                              >
-                                📅 Book Room
-                              </button>
-                              <button
-                                className="btn btn-link p-0" title="View Details"
-                                onClick={() => handleOpenRoomModal('view', r)}
-                              >
-                                <i className="bi bi-eye-fill text-secondary fs-6" />
-                              </button>
-
-                              {isAdmin && (
-                                <>
-                                  <button
-                                    className="btn btn-link p-0" title="Edit Parameters"
-                                    onClick={() => handleOpenRoomModal('edit', r)}
-                                  >
-                                    <i className="bi bi-pencil-square text-primary fs-6" />
-                                  </button>
-                                  <button
-                                    className="btn btn-link p-0" title="Revoke Space (Delete)"
-                                    onClick={() => handleDeleteRoom(r._id)}
-                                  >
-                                    <i className="bi bi-trash text-danger fs-6" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
+      {/* Meeting Rooms Master view */}
+      {isRoomAdmin && activeTab === 'rooms' && (
+        <div className="flex-grow-1 overflow-hidden p-0 d-flex flex-column">
+          <Table
+            columns={roomColumns}
+            data={meetingRooms}
+            isLoading={isRoomLoading}
+            loadingMessage="Fetching rooms specifications..."
+            emptyMessage="No meeting room records designated on this system."
+            currentPage={roomCurrentPage}
+            totalPages={roomTotalPages}
+            totalItems={roomTotalItems}
+            itemsPerPage={roomLimit}
+            onPageChange={(page) => setRoomCurrentPage(page)}
+          />
+        </div>
       )}
 
-      {/* Booking Dialog Modal */}
-      <BookingModal 
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
+      {/* Booking Form Overlay Dialog */}
+      <BookingFormModal
+        isOpen={isBookingFormModalOpen}
+        onClose={() => setIsBookingFormModalOpen(false)}
         onSave={handleSaveBooking}
         editData={selectedBooking}
-        mode={bookingModalMode}
-        properties={properties}
-        floors={floors}
-        meetingRooms={meetingRooms.filter(r => r.status === 'Available')}
+        mode={bookingFormModalMode}
+        meetingRooms={allMeetingRooms.filter(r => r.status === 'Available')}
         bookings={bookings}
       />
 
-      {/* Meeting Room Space Dialog Modal */}
-      <MeetingRoomModal 
-        isOpen={isRoomModalOpen}
-        onClose={() => setIsRoomModalOpen(false)}
+      {/* Booking Detail View Overlay Dialog */}
+      <BookingDetailView
+        viewItem={selectedBooking}
+        onClose={() => setIsBookingDetailViewOpen(false)}
+        onEdit={(booking) => {
+          setIsBookingDetailViewOpen(false);
+          setSelectedBooking(booking);
+          setBookingFormModalMode("edit");
+          setIsBookingFormModalOpen(true);
+        }}
+      />
+
+      {/* Booking Filter Side Drawer */}
+      <BookingFilterDrawer
+        isOpen={isBookingFilterDrawerOpen}
+        onClose={() => setIsBookingFilterDrawerOpen(false)}
+        properties={properties}
+        floors={floors}
+        meetingRooms={allMeetingRooms}
+        selectedProperty={selectedProperty}
+        setSelectedProperty={setSelectedProperty}
+        selectedFloor={selectedFloor}
+        setSelectedFloor={setSelectedFloor}
+        selectedRoom={selectedRoomFilter}
+        setSelectedRoom={setSelectedRoomFilter}
+        onApply={() => fetchBookings(1)}
+        onReset={() => {
+          setSelectedProperty("");
+          setSelectedFloor("");
+          setSelectedRoomFilter("");
+          fetchBookings(1);
+        }}
+      />
+
+      {/* Meeting Room Form Overlay Dialog */}
+      <MeetingRoomFormModal
+        isOpen={isRoomFormModalOpen}
+        onClose={() => setIsRoomFormModalOpen(false)}
         onSave={handleSaveRoom}
         editData={selectedRoom}
-        mode={roomModalMode}
+        mode={roomFormModalMode}
         properties={properties}
         floors={floors}
         units={units}
       />
+
+      {/* Meeting Room Detail View Overlay Dialog */}
+      <MeetingRoomDetailView
+        viewItem={selectedRoom}
+        onClose={() => setIsRoomDetailViewOpen(false)}
+        onEdit={(room) => {
+          setIsRoomDetailViewOpen(false);
+          setSelectedRoom(room);
+          setRoomFormModalMode("edit");
+          setIsRoomFormModalOpen(true);
+        }}
+      />
+
+      {/* Meeting Room Filter Side Drawer */}
+      <MeetingRoomFilterDrawer
+        isOpen={isRoomFilterDrawerOpen}
+        onClose={() => setIsRoomFilterDrawerOpen(false)}
+        properties={properties}
+        floors={floors}
+        selectedProperty={roomSelectedProperty}
+        setSelectedProperty={setRoomSelectedProperty}
+        selectedFloor={roomSelectedFloor}
+        setSelectedFloor={setRoomSelectedFloor}
+        onApply={() => fetchRooms(1)}
+        onReset={() => {
+          setRoomSelectedProperty("");
+          setRoomSelectedFloor("");
+          fetchRooms(1);
+        }}
+      />
+
+      {/* Booking Cancellation Confirmation Modal */}
+      {cancelConfirmId && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 9999,
+            backdropFilter: "blur(4px)"
+          }}
+        >
+          <div
+            className="bg-white rounded-4 shadow-lg overflow-hidden border-0"
+            style={{ width: "100%", maxWidth: "420px", fontFamily: "var(--font-geist-sans)" }}
+          >
+            <div className="border-bottom px-4 py-3 d-flex justify-content-between align-items-center bg-light">
+              <h6 className="fw-bold mb-0 text-dark d-flex align-items-center gap-2" style={{ fontSize: "1rem" }}>
+                <i className="bi bi-exclamation-circle text-danger" /> Confirm Cancellation
+              </h6>
+              <button className="btn-close shadow-none" onClick={() => setCancelConfirmId(null)} />
+            </div>
+
+            <div className="p-4">
+              <p className="text-secondary mb-4" style={{ fontSize: "0.85rem", lineHeight: "1.5" }}>
+                Are you sure you want to cancel this booking reservation? This action cannot be undone.
+              </p>
+
+              <div className="d-flex gap-2 justify-content-end">
+                <button
+                  className="btn btn-outline-secondary btn-sm fw-semibold px-3"
+                  style={{ borderRadius: "4px", fontSize: "0.82rem" }}
+                  onClick={() => setCancelConfirmId(null)}
+                >
+                  Keep Booking
+                </button>
+                <button
+                  className="btn btn-danger btn-sm fw-semibold px-3 text-white border-0"
+                  style={{ backgroundColor: "#dc3545", borderRadius: "4px", fontSize: "0.82rem" }}
+                  onClick={async () => {
+                    if (cancelConfirmId) {
+                      await handleDeleteBooking(cancelConfirmId);
+                      setCancelConfirmId(null);
+                    }
+                  }}
+                >
+                  Yes, Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -193,7 +193,7 @@ export default function OfficeOwnerDashboard({ user }: { user: any }) {
             : <p style={{ textAlign:"center",color:"#94a3b8",margin:"30px 0",fontSize:"0.8rem" }}>No visitor data</p>}
           <div style={{ display:"flex",gap:14,marginTop:12 }}>
             <div><div style={{ fontSize:"0.62rem",color:"#94a3b8" }}>Today</div><div style={{ fontSize:"0.9rem",fontWeight:800 }}>{visitorsToday}</div></div>
-            <div><div style={{ fontSize:"0.62rem",color:"#94a3b8" }}>Pending</div><div style={{ fontSize:"0.9rem",fontWeight:800,color:C.yellow }}>{visitorsPending}</div></div>
+            <div><div style={{ fontSize:"0.62rem",color:"#94a3b8" }}>Expected</div><div style={{ fontSize:"0.9rem",fontWeight:800,color:C.yellow }}>{visitorsPending}</div></div>
             <div><div style={{ fontSize:"0.62rem",color:"#94a3b8" }}>Inside</div><div style={{ fontSize:"0.9rem",fontWeight:800,color:C.green }}>{visitorsCheckedIn}</div></div>
           </div>
         </Panel>
@@ -216,8 +216,8 @@ export default function OfficeOwnerDashboard({ user }: { user: any }) {
           <div style={{ display:"flex",flexDirection:"column",gap:14,padding:"10px 0" }}>
             <div className="d-flex justify-content-between align-items-center bg-light p-3 rounded border">
               <div>
-                <span className="fw-bold text-dark d-block small">Visitors Pending</span>
-                <span className="text-muted" style={{ fontSize:"0.7rem" }}>Awaiting owner action</span>
+                <span className="fw-bold text-dark d-block small">Expected Visitors</span>
+                <span className="text-muted" style={{ fontSize:"0.7rem" }}>Awaiting check-in at security</span>
               </div>
               <span className="badge bg-purple bg-opacity-10 text-purple border border-purple rounded-pill px-3 py-1 fw-bold">{visitorsPending}</span>
             </div>

@@ -43,10 +43,8 @@ export default function Sidebar() {
         ...(hasAccess('view_floors') || user?.role === 'STAFF_ADMIN' ? [{ name: "Floors", path: "/admin/floors", icon: "hgi-layers-01" }] : []),
         ...(hasAccess('view_floors') || user?.role === 'STAFF_ADMIN' ? [{ name: "Units and sft", path: "/admin/units", icon: "hgi-door-01" }] : []),
         ...(hasAccess('view_tenants') || user?.role === 'STAFF_ADMIN' ? [{ name: "Leases", path: "/admin/leases", icon: "hgi-agreement-01" }] : []),
-        // ...(hasAccess('view_finance') || user?.role === 'STAFF_ADMIN' ? [
-        //   { name: "Finance / Billing", path: "/admin/finance", icon: "hgi-invoice-01" }
-        // ] : []),
-        ...(user?.role === 'SUPER_ADMIN' || user?.role === 'Admin' || user?.role === 'FLOOR_ADMIN' || user?.role === 'Owner' || user?.role === 'OFFICE_OWNER' || user?.role === 'STAFF_ADMIN' ? [
+
+        ...(user ? [
           { name: "Payments", path: "/admin/payments", icon: "hgi-credit-card" }
         ] : []),
       ]
@@ -75,12 +73,6 @@ export default function Sidebar() {
       items: [
         ...(hasAccess('manage_staff') ? [
           { name: "Access Management", path: "/admin/users", icon: "hgi-user-shield-01" },
-        ] : []),
-        ...(hasAccess('view_analytics') ? [
-          { name: "Occupancy Analytics", path: "/admin/occupancy", icon: "hgi-pie-chart" }
-        ] : []),
-        ...(isSuperAdmin || user?.role === 'STAFF_ADMIN' ? [
-          { name: "Reports", path: "/admin/reports", icon: "hgi-analytics-01" }
         ] : [])
       ]
     },

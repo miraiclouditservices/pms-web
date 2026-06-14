@@ -1,358 +1,579 @@
 "use client";
-import { useState, useEffect } from "react";
-import UnitModal from "@/components/dashboard/UnitModal";
-import { api } from "@/utils/api";
 
+import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { api } from "@/utils/api";
+import Table, { TableColumn } from "@/components/common/Table";
+import UnitModal from "@/components/dashboard/UnitModal";
+
+const ITEMS_PER_PAGE = 10;
+
+const STATUS_COLOR: Record<string, string> = {
+  Available: "success",
+  Occupied: "primary",
+  Reserved: "warning",
+  Maintenance: "danger",
+  "Under Maintenance": "danger",
+};
+
+// ── Unit Filter Drawer Component ─────────────────────────────────────────────
+interface UnitFilterDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  properties: any[];
+  floors: any[];
+  selectedPropertyId: string;
+  setSelectedPropertyId: (id: string) => void;
+  selectedFloorId: string;
+  setSelectedFloorId: (id: string) => void;
+  statusFilter: string;
+  setStatusFilter: (status: string) => void;
+  onApply: () => void;
+  onReset: () => void;
+}
+
+function UnitFilterDrawer({
+  isOpen,
+  onClose,
+  properties,
+  floors,
+  selectedPropertyId,
+  setSelectedPropertyId,
+  selectedFloorId,
+  setSelectedFloorId,
+  statusFilter,
+  setStatusFilter,
+  onApply,
+  onReset,
+}: UnitFilterDrawerProps) {
+  const filteredFloors = floors.filter(
+    (f) =>
+      selectedPropertyId === "all" ||
+      f.property === selectedPropertyId ||
+      (f.property && f.property._id === selectedPropertyId)
+  );
+
+  return (
+    <>
+      {isOpen && (
+        <div
+          onClick={onClose}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.3)",
+            zIndex: 1000,
+          }}
+        />
+      )}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: isOpen ? 0 : -340,
+          width: 340,
+          height: "100vh",
+          background: "#fff",
+          borderLeft: "1px solid #e2e8f0",
+          zIndex: 1001,
+          transition: "right 0.3s ease-in-out",
+          padding: 24,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <span className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>
+            Filter Units
+          </span>
+          <button onClick={onClose} className="btn-close shadow-none" style={{ fontSize: "0.8rem" }} />
+        </div>
+
+        <div className="flex-grow-1">
+          {/* Property Filter */}
+          <div className="mb-4">
+            <label className="form-label fw-bold text-muted" style={{ fontSize: "0.76rem", textTransform: "uppercase" }}>
+              Property Name
+            </label>
+            <select
+              className="form-select shadow-none"
+              value={selectedPropertyId}
+              onChange={(e) => {
+                setSelectedPropertyId(e.target.value);
+                setSelectedFloorId("all");
+              }}
+              style={{ fontSize: "0.85rem", borderRadius: "6px" }}
+            >
+              <option value="all">All Properties</option>
+              {properties.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.propertyName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Floor Filter */}
+          <div className="mb-4">
+            <label className="form-label fw-bold text-muted" style={{ fontSize: "0.76rem", textTransform: "uppercase" }}>
+              Floor Level
+            </label>
+            <select
+              className="form-select shadow-none"
+              value={selectedFloorId}
+              onChange={(e) => setSelectedFloorId(e.target.value)}
+              disabled={selectedPropertyId === "all"}
+              style={{ fontSize: "0.85rem", borderRadius: "6px" }}
+            >
+              <option value="all">All Floors</option>
+              {filteredFloors.map((f) => (
+                <option key={f._id} value={f._id}>
+                  {f.floorName || `Floor ${f.floorNumber}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="mb-4">
+            <label className="form-label fw-bold text-muted" style={{ fontSize: "0.76rem", textTransform: "uppercase" }}>
+              Operational Status
+            </label>
+            <select
+              className="form-select shadow-none"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ fontSize: "0.85rem", borderRadius: "6px" }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="Available">Available</option>
+              <option value="Occupied">Occupied</option>
+              <option value="Reserved">Reserved</option>
+              <option value="Maintenance">Maintenance</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Drawer Actions */}
+        <div className="d-flex gap-2 pt-3 border-top">
+          <button
+            onClick={onReset}
+            className="btn btn-sm btn-light border flex-grow-1 py-2"
+            style={{ fontSize: "0.82rem", fontWeight: 600, borderRadius: "6px" }}
+          >
+            Reset
+          </button>
+          <button
+            onClick={onApply}
+            className="btn btn-sm text-white flex-grow-1 py-2"
+            style={{ backgroundColor: "#014aad", fontSize: "0.82rem", fontWeight: 600, borderRadius: "6px" }}
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Main Units Page ──────────────────────────────────────────────────────────
 export default function UnitsPage() {
   const [units, setUnits] = useState<any[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
   const [floors, setFloors] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editUnit, setEditUnit] = useState<any>(null);
 
-  // Filters & Pagination
+  // Search & Filter state
   const [selectedPropertyId, setSelectedPropertyId] = useState("all");
   const [selectedFloorId, setSelectedFloorId] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Modal controls
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editUnit, setEditUnit] = useState<any>(null);
+
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(val);
+      setCurrentPage(1);
+    }, 400);
+  };
 
   useEffect(() => {
     fetchProperties();
     fetchFloors();
   }, []);
 
-  useEffect(() => {
-    // Only call backend if searchQuery is empty or has length >= 3
-    if (searchQuery.length === 0 || searchQuery.length >= 3) {
-      fetchUnits();
-    }
-  }, [currentPage, selectedPropertyId, selectedFloorId, selectedStatus, searchQuery]);
+  const buildParams = useCallback(() => {
+    const p: Record<string, string> = {
+      page: String(currentPage),
+      limit: String(ITEMS_PER_PAGE),
+    };
+    if (debouncedSearch.trim()) p.search = debouncedSearch.trim();
+    if (selectedPropertyId !== "all") p.property = selectedPropertyId;
+    if (selectedFloorId !== "all") p.floor = selectedFloorId;
+    if (selectedStatus !== "all") p.unitStatus = selectedStatus;
+    return new URLSearchParams(p).toString();
+  }, [currentPage, debouncedSearch, selectedPropertyId, selectedFloorId, selectedStatus]);
 
-  const fetchFloors = async () => {
+  const fetchUnits = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const response = await api.get('/floors?limit=100');
-      if (response.success) setFloors(response.data);
-    } catch (err) {
-      console.error("Error fetching floors:", err);
-    }
-  };
-
-  const fetchUnits = async () => {
-    try {
-      const searchParam = (searchQuery.length === 0 || searchQuery.length >= 3) ? searchQuery : "";
-      
-      const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-        property: selectedPropertyId,
-        floor: selectedFloorId,
-        unitStatus: selectedStatus,
-        search: searchParam
-      });
-
-      const response = await api.get(`/units?${queryParams.toString()}`);
-      if (response.success) {
-        setUnits(response.data);
-        setTotalPages(response.totalPages || 1);
+      const r = await api.get(`/units?${buildParams()}`);
+      if (r.success) {
+        setUnits(r.data);
+        setTotalPages(r.totalPages || r.pagination?.pages || 1);
+        setTotalItems(r.total || r.pagination?.total || r.data.length);
       }
-    } catch (err) {
-      console.error("Error fetching units:", err);
+    } catch {} finally {
+      setIsLoading(false);
     }
-  };
+  }, [buildParams]);
+
+  useEffect(() => {
+    fetchUnits();
+  }, [fetchUnits]);
 
   const fetchProperties = async () => {
     try {
-      const response = await api.get('/properties');
-      if (response.success) setProperties(response.data);
-    } catch (err) {
-      console.error("Error fetching properties:", err);
-    }
+      const r = await api.get("/properties");
+      if (r.success) setProperties(r.data);
+    } catch {}
+  };
+
+  const fetchFloors = async () => {
+    try {
+      const r = await api.get("/floors?limit=100");
+      if (r.success) setFloors(r.data);
+    } catch {}
   };
 
   const handleSaveUnit = async (data: any) => {
     try {
-      if (editUnit) {
-        await api.put(`/units/${editUnit._id}`, data);
-      } else {
-        await api.post('/units', data);
-      }
+      if (editUnit) await api.put(`/units/${editUnit._id}`, data);
+      else await api.post("/units", data);
       fetchUnits();
-    } catch (err) {
-      console.error("Error saving unit:", err);
-    }
+    } catch {}
     setIsModalOpen(false);
     setEditUnit(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this unit?")) {
-      try {
-        await api.delete(`/units/${id}`);
-        fetchUnits();
-      } catch (err) {
-        console.error("Error deleting unit:", err);
-      }
-    }
+  const handleReset = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setSelectedPropertyId("all");
+    setSelectedFloorId("all");
+    setSelectedStatus("all");
+    setCurrentPage(1);
+    setShowFilters(false);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Available': return 'success';
-      case 'Occupied': return 'primary';
-      case 'Reserved': return 'warning';
-      case 'Maintenance': return 'danger';
-      case 'Under Maintenance': return 'danger';
-      default: return 'secondary';
-    }
+  const activeFilters = [
+    debouncedSearch.trim() !== "",
+    selectedPropertyId !== "all",
+    selectedFloorId !== "all",
+    selectedStatus !== "all",
+  ].filter(Boolean).length;
+
+  const occupantDisplay = (unit: any) => {
+    if (unit.lease) return { name: unit.lease.tenantName || "—", badge: "Lease Holder", color: "info", phone: unit.lease.tenantContact };
+    if (unit.tenant) return { name: unit.tenant.tenantName || "—", badge: "Tenant", color: "primary", phone: unit.tenant.contactNumber };
+    if (unit.owner) return { name: unit.owner.ownerName || "—", badge: "Office Owner", color: "success", phone: unit.owner.contactNumber };
+    if (unit.ownerName) return { name: unit.ownerName, badge: "Office Owner", color: "success", phone: "" };
+    return null;
   };
 
-  // Extract available floors from the floors state based on selected property
-  const availableFloors = floors.filter(f => f.property === selectedPropertyId || (f.property && f.property._id === selectedPropertyId));
+  const columns: TableColumn<any>[] = [
+    {
+      header: "#",
+      style: { width: 56 },
+      render: (_, i) => (
+        <span className="text-muted fw-semibold" style={{ fontSize: "0.8rem" }}>
+          {String((currentPage - 1) * ITEMS_PER_PAGE + i + 1).padStart(3, "0")}
+        </span>
+      ),
+    },
+    {
+      header: "Unit Details",
+      render: (u) => (
+        <div className="d-flex align-items-center gap-3">
+          <div className="rounded d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 38, height: 38, backgroundColor: "#e8f0fe", color: "#1a73e8" }}>
+            <i className="bi bi-door-open-fill"></i>
+          </div>
+          <div>
+            <div className="d-flex align-items-center gap-2">
+              <Link href={`/admin/units/${u._id}`} className="fw-bold text-dark text-decoration-none" style={{ fontSize: "0.88rem" }}>
+                {u.unitName || `Unit ${u.unitNumber}`}
+              </Link>
+              <span className="badge bg-light text-secondary border px-2 py-1" style={{ fontSize: "0.65rem" }}>
+                {u.sqft ? u.sqft.toLocaleString() : 0} SFT
+              </span>
+            </div>
+            <span className="text-muted" style={{ fontSize: "0.74rem" }}>
+              {u.unitName ? `Unit ${u.unitNumber} · ${u.unitType}` : u.unitType}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Property / Floor",
+      render: (u) => (
+        <div>
+          <div className="fw-bold text-dark" style={{ fontSize: "0.85rem" }}>
+            {u.property?.propertyName || "—"}
+          </div>
+          <span className="badge bg-light text-muted border rounded-pill mt-1" style={{ fontSize: "0.7rem", padding: "3px 8px" }}>
+            {u.floor?.floorName || `Floor ${u.floor?.floorNumber || u.floorNumber || "—"}`}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Occupant",
+      render: (u) => {
+        const occ = occupantDisplay(u);
+        if (!occ) return <span className="text-muted small">—</span>;
+        return (
+          <div>
+            <div className="fw-bold text-dark d-flex align-items-center gap-1" style={{ fontSize: "0.85rem" }}>
+              {occ.name}
+            </div>
+            {occ.phone && <div className="text-muted" style={{ fontSize: "0.72rem" }}>{occ.phone}</div>}
+            <span className={`badge bg-${occ.color} bg-opacity-10 text-${occ.color} border border-${occ.color} border-opacity-25 rounded-pill mt-1`} style={{ fontSize: "0.6rem" }}>
+              {occ.badge}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Status",
+      render: (u) =>
+        u.isMeetingRoom ? (
+          <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-1 fw-bold" style={{ fontSize: "0.72rem" }}>
+            Meeting Room
+          </span>
+        ) : (
+          <span className={`badge bg-${STATUS_COLOR[u.unitStatus] || "secondary"} bg-opacity-10 text-${STATUS_COLOR[u.unitStatus] || "secondary"} border border-${STATUS_COLOR[u.unitStatus] || "secondary"} border-opacity-25 rounded-pill px-2 py-1 fw-bold`} style={{ fontSize: "0.72rem" }}>
+            {u.unitStatus || "Available"}
+          </span>
+        ),
+    },
+    {
+      header: "Actions",
+      style: { textAlign: "right" as const },
+      render: (u) => (
+        <div className="d-flex gap-2 justify-content-end" onClick={(e) => e.stopPropagation()}>
+          <Link
+            href={`/admin/units/${u._id}`}
+            title="View Details"
+            className="d-flex align-items-center justify-content-center text-decoration-none"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "6px",
+              border: "1px solid #e2e8f0",
+              background: "#fff",
+              color: "#64748b",
+            }}
+          >
+            <i className="bi bi-eye" style={{ fontSize: "0.9rem" }}></i>
+          </Link>
+          <button
+            title="Edit"
+            onClick={() => {
+              setEditUnit(u);
+              setIsModalOpen(true);
+            }}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "6px",
+              border: "1px solid #e2e8f0",
+              background: "#fff",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <i className="bi bi-pencil-square" style={{ fontSize: "0.9rem", color: "#014aad" }}></i>
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-0 p-md-0 d-flex flex-column" style={{ backgroundColor: '#ffffff', height: 'calc(100vh - 120px)', overflow: 'hidden', fontFamily: 'var(--font-geist-sans)' }}>
-      <UnitModal 
-        isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setEditUnit(null); }} 
-        onSave={handleSaveUnit} 
+    <div
+      className="p-0 d-flex flex-column bg-white border rounded-4"
+      style={{ height: "calc(100vh - 104px)", fontFamily: "var(--font-geist-sans)", overflow: "hidden" }}
+    >
+      <UnitModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditUnit(null);
+        }}
+        onSave={handleSaveUnit}
         editData={editUnit}
       />
-      
-      <div className="bg-white border-2 d-flex flex-column flex-grow-1" style={{ borderRadius: '8px', padding: '10px 10px', border: '1px solid #e0e0e0', margin: '0', overflow: 'hidden' }}>
-        {/* Header & Filter Bar Merged */}
-        <div className="d-flex justify-content-between align-items-center mb-3 pb-2 pt-0 flex-shrink-0" style={{ backgroundColor: '#ffffff' }}>
-          {/* Left: Tab Headers */}
-          <div className="d-flex w-100 position-absolute" style={{ bottom: '0', left: '0', zIndex: -1, borderColor: '#e0e0e0' }}></div>
-          <div className="d-flex gap-4">
-            <div style={{ paddingBottom: '8px', cursor: 'pointer', marginBottom: '-1px' }}>
-              <span className="fw-bold text-dark" style={{ fontSize: '1rem' }}>Units and sft</span>
-            </div>
-          </div>
 
-          {/* Right: Filters & Add Button */}
-          <div className="d-flex gap-3 align-items-center">
-            
-            {/* Search Bar */}
-            <div className="input-group shadow-sm" style={{ width: '220px', borderRadius: '4px', overflow: 'hidden' }}>
-              <span className="input-group-text bg-white border-end-0 text-muted" style={{ borderColor: '#e0e0e0' }}>
-                <i className="bi bi-search"></i>
-              </span>
-              <input 
-                type="text" 
-                className="form-control border-start-0 ps-0" 
-                placeholder="Search unit..." 
-                style={{ borderColor: '#e0e0e0', fontSize: '0.85rem' }}
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              />
-            </div>
-            
-            <div style={{ width: '180px' }}>
-              <select className="form-select px-3 py-2 shadow-sm" style={{ borderRadius: '4px', border: '1px solid #e0e0e0', fontSize: '0.85rem' }} value={selectedPropertyId} onChange={(e) => { setSelectedPropertyId(e.target.value); setSelectedFloorId("all"); setCurrentPage(1); }}>
-                <option value="all">All Properties</option>
-                {properties.map(p => <option key={p._id} value={p._id}>{p.propertyName}</option>)}
-              </select>
-            </div>
-            
-            {selectedPropertyId !== "all" && (
-              <div style={{ width: '150px' }}>
-                <select className="form-select px-3 py-2 shadow-sm" style={{ borderRadius: '4px', border: '1px solid #e0e0e0', fontSize: '0.85rem' }} value={selectedFloorId} onChange={(e) => { setSelectedFloorId(e.target.value); setCurrentPage(1); }}>
-                  <option value="all">All Floors</option>
-                  {availableFloors.map((f: any) => <option key={f._id} value={f._id}>{f.floorNumber || `Floor ${f.floorNumber}`}</option>)}
-                </select>
-              </div>
+      <UnitFilterDrawer
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        properties={properties}
+        floors={floors}
+        selectedPropertyId={selectedPropertyId}
+        setSelectedPropertyId={setSelectedPropertyId}
+        selectedFloorId={selectedFloorId}
+        setSelectedFloorId={setSelectedFloorId}
+        statusFilter={selectedStatus}
+        setStatusFilter={setSelectedStatus}
+        onApply={() => {
+          setCurrentPage(1);
+          setShowFilters(false);
+        }}
+        onReset={handleReset}
+      />
+
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center px-4 pt-3 pb-2 flex-shrink-0" style={{ backgroundColor: "#ffffff" }}>
+        <div>
+          <span className="fw-bold text-dark" style={{ fontSize: "1rem" }}>
+            Units & SFT
+          </span>
+          <div className="text-muted mt-1" style={{ fontSize: "0.72rem" }}>
+            Manage commercial units, office spaces, occupancy statuses, and area configurations
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="d-flex gap-2 align-items-center">
+          {/* Search bar */}
+          <div className="position-relative">
+            <input
+              type="text"
+              className="form-control shadow-none"
+              placeholder="Search units..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              style={{
+                width: 210,
+                height: 40,
+                borderRadius: "6px",
+                border: "1px solid #e2e8f0",
+                fontSize: "0.82rem",
+                paddingRight: 32,
+              }}
+            />
+            {searchTerm ? (
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  fontSize: "1.1rem",
+                }}
+              >
+                &times;
+              </button>
+            ) : (
+              <i className="bi bi-search position-absolute text-muted" style={{ right: 12, top: "50%", transform: "translateY(-50%)", fontSize: "0.8rem" }} />
             )}
-            
-            <div style={{ width: '150px' }}>
-              <select className="form-select px-3 py-2 shadow-sm" style={{ borderRadius: '4px', border: '1px solid #e0e0e0', fontSize: '0.85rem' }} value={selectedStatus} onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}>
-                <option value="all">All Statuses</option>
-                <option value="Available">Available</option>
-                <option value="Occupied">Occupied</option>
-                <option value="Reserved">Reserved</option>
-                <option value="Maintenance">Maintenance</option>
-              </select>
-            </div>
-
-            <button
-              className="btn d-flex align-items-center justify-content-center gap-2 shadow-sm px-4"
-              onClick={() => { setEditUnit(null); setIsModalOpen(true); }}
-              style={{ backgroundColor: "#014aad", color: '#ffffff', fontWeight: '500', borderRadius: '4px', height: '40px', fontSize: '0.85rem', border: 'none' }}
-            >
-              <i className="bi bi-plus-circle"></i> Add Unit
-            </button>
           </div>
-        </div>
 
-        {/* Table Wrapper (Scrolling) */}
-        <div className="table-responsive flex-grow-1" style={{ overflowY: 'auto', minHeight: 0 }}>
-          <table className="table mb-0 border-0 text-nowrap" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
-            <thead>
-              <tr className="border-0">
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopLeftRadius: '8px' }}>Sl no</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property Sft details</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Property / Floor</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Tenant details</th>
-                <th className="py-3 px-4 fw-bold text-start" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none' }}>Status</th>
-                <th className="py-3 px-4 fw-bold text-center" style={{ position: 'sticky', top: '0', zIndex: 9, fontSize: '0.8rem', backgroundColor: '#3f3f3f', color: '#ffffff', border: 'none', borderTopRightRadius: '8px' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {units.length > 0 ? (
-                units.map((unit, index) => (
-                  <tr key={unit._id} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                    <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', color: '#555', border: 'none' }}>
-                      {String((currentPage - 1) * itemsPerPage + index + 1).padStart(3, '0')}
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      <div className="d-flex align-items-center gap-3">
-                        <div className="bg-primary bg-opacity-10 text-primary rounded d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
-                          <i className="bi bi-door-open-fill"></i>
-                        </div>
-                        <div>
-                          <div className="d-flex align-items-center gap-2">
-                            <div className="fw-bold text-dark" style={{ fontSize: '0.9rem' }}>
-                              {unit.unitName ? unit.unitName : `Unit ${unit.unitNumber}`}
-                            </div>
-                            <span className="badge bg-light text-secondary border px-2 py-1" style={{ fontSize: '0.65rem' }}>{unit.sqft ? unit.sqft.toLocaleString() : 0} SFT</span>
-                          </div>
-                          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-                            {unit.unitName ? `Unit ${unit.unitNumber} • ${unit.unitType}` : unit.unitType}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      <div className="fw-bold text-dark" style={{ fontSize: '0.85rem' }}>{unit.property?.propertyName || 'N/A'}</div>
-                      <span className="badge bg-light text-muted border rounded-pill px-2 py-1 mt-1" style={{ fontSize: '0.7rem' }}>
-                        {unit.floor?.floorName || `Floor ${unit.floor?.floorNumber || unit.floorNumber}`}
-                      </span>
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ fontSize: '0.85rem', border: 'none' }}>
-                      {unit.lease ? (
-                        <div>
-                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
-                            <i className="bi bi-file-earmark-text-fill text-info" style={{ fontSize: '0.85rem' }}></i>
-                            {unit.lease.tenantName || '—'}
-                          </div>
-                          {unit.lease.tenantContact && (
-                            <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
-                              <i className="bi bi-telephone-fill" style={{ fontSize: '0.65rem' }}></i>
-                              {unit.lease.tenantContact}
-                            </div>
-                          )}
-                          <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Lease Holder</span>
-                        </div>
-                      ) : unit.tenant ? (
-                        <div>
-                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
-                            <i className="bi bi-person-fill text-primary" style={{ fontSize: '0.85rem' }}></i>
-                            {unit.tenant.tenantName || '—'}
-                          </div>
-                          {unit.tenant.contactNumber && (
-                            <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
-                              <i className="bi bi-telephone-fill" style={{ fontSize: '0.65rem' }}></i>
-                              {unit.tenant.contactNumber}
-                            </div>
-                          )}
-                          <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>Tenant</span>
-                        </div>
-                      ) : unit.owner ? (
-                        <div>
-                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
-                            <i className="bi bi-person-badge-fill text-success" style={{ fontSize: '0.85rem' }}></i>
-                            {unit.owner.ownerName || unit.ownerName || 'OFFICE_OWNER'}
-                          </div>
-                          {unit.owner.contactNumber && (
-                            <div className="text-muted d-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.7rem' }}>
-                              <i className="bi bi-telephone-fill" style={{ fontSize: '0.65rem' }}></i>
-                              {unit.owner.contactNumber}
-                            </div>
-                          )}
-                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>OFFICE_OWNER</span>
-                        </div>
-                      ) : unit.ownerName ? (
-                        <div>
-                          <div className="fw-bold text-dark d-flex align-items-center gap-1">
-                            <i className="bi bi-person-badge-fill text-success" style={{ fontSize: '0.85rem' }}></i>
-                            {unit.ownerName}
-                          </div>
-                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill mt-1" style={{ fontSize: '0.6rem' }}>OFFICE_OWNER</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted small">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-4 align-middle" style={{ border: 'none' }}>
-                      {unit.isMeetingRoom ? (
-                        <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-1 border border-warning border-opacity-25" style={{ fontSize: '0.75rem' }}>
-                          🏢 Meeting Room
-                        </span>
-                      ) : (
-                        <span className={`badge bg-${getStatusColor(unit.unitStatus)} bg-opacity-10 text-${getStatusColor(unit.unitStatus)} rounded-pill px-3 py-1 border border-${getStatusColor(unit.unitStatus)} border-opacity-25`} style={{ fontSize: '0.75rem' }}>
-                          {unit.unitStatus || 'Available'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2 px-4 align-middle text-center" style={{ border: 'none' }}>
-                      <div className="d-flex gap-2 justify-content-center align-items-center">
-                        <button className="btn btn-link text-dark p-0" title="Edit Unit" onClick={() => { setEditUnit(unit); setIsModalOpen(true); }}>
-                          <i className="bi bi-pencil-square" style={{ fontSize: '1.1rem', color: '#014aad' }}></i>
-                        </button>
-                        <button className="btn btn-link text-danger p-0" title="Delete Unit" onClick={() => handleDelete(unit._id)}>
-                          <i className="bi bi-trash-fill" style={{ fontSize: '1.1rem' }}></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="text-center py-5">
-                    <div className="d-flex flex-column align-items-center gap-3 py-4">
-                      <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '80px', height: '80px' }}>
-                        <i className="bi bi-door-open text-muted" style={{ fontSize: '2.5rem' }}></i>
-                      </div>
-                      <div className="text-center">
-                        <h5 className="fw-bold mb-1">No Units Found</h5>
-                        <p className="text-muted small mx-auto" style={{ maxWidth: '300px' }}>
-                          No units match the selected filters.
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {/* Filters Toggle Button */}
+          <button
+            onClick={() => setShowFilters(true)}
+            className="btn btn-outline-secondary d-flex align-items-center gap-2 px-3 position-relative"
+            style={{
+              height: 40,
+              fontSize: "0.82rem",
+              borderRadius: "6px",
+              border: "1px solid #e2e8f0",
+              fontWeight: 500,
+              backgroundColor: activeFilters > 0 ? "#f8fafc" : "#fff",
+            }}
+          >
+            <i className="bi bi-funnel" /> Filters
+            {activeFilters > 0 && (
+              <span
+                className="position-absolute bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                style={{
+                  top: -6,
+                  right: -6,
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  fontSize: "0.68rem",
+                  backgroundColor: "#014aad",
+                }}
+              >
+                {activeFilters}
+              </span>
+            )}
+          </button>
+
+          {/* Add Unit Button */}
+          <button
+            onClick={() => {
+              setEditUnit(null);
+              setIsModalOpen(true);
+            }}
+            className="btn fw-bold text-white border-0 d-flex align-items-center justify-content-center gap-2"
+            style={{
+              backgroundColor: "#014aad",
+              fontSize: "0.85rem",
+              height: 40,
+              borderRadius: "6px",
+              padding: "0 16px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <i className="bi bi-plus-lg"></i> Add Unit
+          </button>
         </div>
-        
-        {/* Pagination */}
-        {units.length > 0 && (
-          <div className="d-flex justify-content-between align-items-center pt-3 border-top mt-2 flex-shrink-0">
-            <span className="text-muted small">
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="d-flex gap-2">
-              <button 
-                className="btn btn-outline-secondary rounded-pill px-3 py-1 btn-sm d-flex align-items-center gap-1" 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                <i className="bi bi-chevron-left small"></i> Previous
-              </button>
-              <button 
-                className="btn btn-outline-secondary rounded-pill px-3 py-1 btn-sm d-flex align-items-center gap-1" 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                Next <i className="bi bi-chevron-right small"></i>
-              </button>
-            </div>
-          </div>
-        )}
+      </div>
+
+      {/* Table */}
+      <div className="flex-grow-1 overflow-hidden d-flex flex-column">
+        <Table
+          columns={columns}
+          data={units}
+          isLoading={isLoading}
+          loadingMessage="Loading units..."
+          emptyMessage="No units configured matching the selected filters."
+          containerClassName="table-responsive"
+          containerStyle={{ flexGrow: 1, overflowY: "auto" }}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

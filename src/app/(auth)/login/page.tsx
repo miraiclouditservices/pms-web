@@ -199,7 +199,7 @@ export default function LoginPage() {
               <img 
                 src={slide.image} 
                 alt={slide.title} 
-                className="img-fluid rounded shadow-lg"
+                className="img-fluid"
                 style={{ 
                   maxWidth: '90%', 
                   maxHeight: '100%', 
